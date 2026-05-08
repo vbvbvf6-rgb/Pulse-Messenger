@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Zap, Users, TrendingUp, Send, CheckCircle, AlertTriangle, RefreshCw, Plus, Trash2, Key, BadgeCheck, X } from "lucide-react";
+import { Shield, Zap, Users, TrendingUp, Send, CheckCircle, AlertTriangle, RefreshCw, Plus, Trash2, Key, BadgeCheck, X, ShieldCheck, ShieldOff } from "lucide-react";
 
 const ADMIN_USER_IDS = [4];
 
@@ -14,6 +14,7 @@ interface AdminUser {
   balance: number;
   created_at: string;
   is_verified: boolean;
+  is_admin: boolean;
 }
 
 interface Stats {
@@ -28,18 +29,15 @@ function getHeader(): Record<string, string> {
 
 export default function Admin() {
   const userId = Number(localStorage.getItem("pulse-user-id") || "0");
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
 
-  if (!ADMIN_USER_IDS.includes(userId)) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Shield size={64} className="mx-auto mb-4 text-destructive opacity-50" />
-          <h2 className="text-2xl font-bold text-foreground mb-2">Доступ запрещён</h2>
-          <p className="text-muted-foreground">У вас нет прав администратора</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    fetch("/api/admin/check", { headers: getHeader() })
+      .then(r => r.json())
+      .then(d => { setHasAccess(d.isAdmin === true); setAccessChecked(true); })
+      .catch(() => { setHasAccess(ADMIN_USER_IDS.includes(userId)); setAccessChecked(true); });
+  }, [userId]);
 
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -133,6 +131,21 @@ export default function Admin() {
     } catch { showToast("Ошибка", "err"); }
   };
 
+  const handleToggleAdmin = async (target: AdminUser) => {
+    try {
+      const res = await fetch("/api/admin/set-admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ userId: target.id, isAdmin: !target.is_admin }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast(`${!target.is_admin ? "🛡️ Права выданы" : "🚫 Права сняты"}: @${target.username}`, "ok");
+      setUsers(prev => prev.map(u => u.id === target.id ? { ...u, is_admin: !target.is_admin } : u));
+      setSelectedUser(prev => prev?.id === target.id ? { ...prev, is_admin: !target.is_admin } : prev);
+    } catch { showToast("Ошибка", "err"); }
+  };
+
   const handleDeleteUser = async () => {
     if (!deleteConfirm) return;
     setDeleteLoading(true);
@@ -158,6 +171,25 @@ export default function Admin() {
     u.username.toLowerCase().includes(search.toLowerCase()) ||
     u.display_name.toLowerCase().includes(search.toLowerCase())
   );
+
+  if (!accessChecked) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-background">
+        <RefreshCw size={32} className="animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (!hasAccess) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Shield size={64} className="mx-auto mb-4 text-destructive opacity-50" />
+          <h2 className="text-2xl font-bold text-foreground mb-2">Доступ запрещён</h2>
+          <p className="text-muted-foreground">У вас нет прав администратора</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
@@ -447,6 +479,19 @@ export default function Admin() {
                         <BadgeCheck size={18} />
                         {selectedUser.is_verified ? "Снять верификацию" : "Выдать верификацию ✓"}
                       </button>
+                      {!ADMIN_USER_IDS.includes(selectedUser.id) && (
+                        <button
+                          onClick={() => handleToggleAdmin(selectedUser)}
+                          className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-sm font-medium ${
+                            selectedUser.is_admin
+                              ? "bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20"
+                              : "bg-card border-border text-muted-foreground hover:border-purple-500/30 hover:text-purple-400"
+                          }`}
+                        >
+                          {selectedUser.is_admin ? <ShieldOff size={18} /> : <ShieldCheck size={18} />}
+                          {selectedUser.is_admin ? "Снять права администратора" : "Выдать права администратора"}
+                        </button>
+                      )}
                       <button
                         onClick={() => setDeleteConfirm(selectedUser)}
                         className="w-full flex items-center gap-3 p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 transition-all text-sm font-medium"

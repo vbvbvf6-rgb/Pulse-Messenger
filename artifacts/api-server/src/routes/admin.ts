@@ -8,17 +8,25 @@ const router = Router();
 const ADMIN_USER_IDS = [4];
 const hash = (pass: string) => createHash("sha256").update(pass).digest("hex");
 
-function requireAdmin(req: any, res: any, next: any) {
-  if (!ADMIN_USER_IDS.includes(req.currentUserId)) {
-    return res.status(403).json({ error: "Доступ запрещён" });
-  }
+async function isAdminUser(userId: number): Promise<boolean> {
+  if (ADMIN_USER_IDS.includes(userId)) return true;
+  try {
+    const rows = await db.execute(sql`SELECT is_admin FROM users WHERE id = ${userId}`);
+    const user = rows.rows[0] as any;
+    return !!user?.is_admin;
+  } catch { return false; }
+}
+
+async function requireAdmin(req: any, res: any, next: any) {
+  const ok = await isAdminUser(req.currentUserId);
+  if (!ok) return res.status(403).json({ error: "Доступ запрещён" });
   next();
 }
 
 router.get("/admin/users", requireAdmin, async (req, res) => {
   try {
     const rows = await db.execute(
-      sql`SELECT id, username, display_name, avatar_color, avatar_url, status, balance, created_at, is_verified FROM users ORDER BY id`
+      sql`SELECT id, username, display_name, avatar_color, avatar_url, status, balance, created_at, is_verified, is_admin FROM users ORDER BY id`
     );
     res.json(rows.rows);
   } catch (err) {
@@ -125,6 +133,31 @@ router.post("/admin/set-verified", requireAdmin, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.post("/admin/set-admin", requireAdmin, async (req, res) => {
+  try {
+    const { userId, isAdmin } = req.body;
+    if (!userId) return res.status(400).json({ error: "Укажите userId" });
+    const targetId = Number(userId);
+    if (ADMIN_USER_IDS.includes(targetId)) {
+      return res.status(400).json({ error: "Нельзя изменить права суперадминистратора" });
+    }
+    await db.execute(sql`UPDATE users SET is_admin = ${!!isAdmin} WHERE id = ${targetId}`);
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.get("/admin/check", async (req, res) => {
+  try {
+    const ok = await isAdminUser(req.currentUserId);
+    res.json({ isAdmin: ok });
+  } catch (err) {
     res.status(500).json({ error: "Ошибка сервера" });
   }
 });

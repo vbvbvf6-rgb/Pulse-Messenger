@@ -7,19 +7,27 @@ interface RegisterProps {
   onLogin: (userId: number) => void;
 }
 
+const AGE_GROUPS = [
+  { value: "5-13", label: "5–13 лет (дети)" },
+  { value: "14-18", label: "14–18 лет (подростки)" },
+  { value: "18-30", label: "18–30 лет (молодёжь)" },
+  { value: "30+", label: "30+ лет (взрослые)" },
+];
+
 export default function Register({ onLogin }: RegisterProps) {
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [ageGroup, setAgeGroup] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !displayName.trim() || !password) {
-      setError("Заполните все поля");
+    if (!username.trim() || !displayName.trim() || !password || !ageGroup) {
+      setError("Заполните все поля, включая возрастную группу");
       return;
     }
     if (password !== confirmPassword) {
@@ -44,7 +52,7 @@ export default function Register({ onLogin }: RegisterProps) {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), displayName: displayName.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), displayName: displayName.trim(), password, ageGroup }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -144,6 +152,26 @@ export default function Register({ onLogin }: RegisterProps) {
                 autoComplete="new-password"
                 className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors text-sm"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-foreground mb-1.5">Возрастная группа</label>
+              <div className="grid grid-cols-2 gap-2">
+                {AGE_GROUPS.map((g) => (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => setAgeGroup(g.value)}
+                    className={`px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                      ageGroup === g.value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {error && (

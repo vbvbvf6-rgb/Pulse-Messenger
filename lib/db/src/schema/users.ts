@@ -15,6 +15,8 @@ export const usersTable = pgTable("users", {
   phoneNumber: text("phone_number"),
   isBot: boolean("is_bot").notNull().default(false),
   isVerified: boolean("is_verified").notNull().default(false),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  ageGroup: text("age_group"),
   passwordHash: text("password_hash"),
   balance: numeric("balance").notNull().default("0"),
   usernameChangedAt: timestamp("username_changed_at", { withTimezone: true }),

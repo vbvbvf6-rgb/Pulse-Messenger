@@ -71,12 +71,12 @@ export default function Login({ onLogin }: LoginProps) {
         <div className="bg-card border border-border rounded-3xl p-6 shadow-2xl">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-foreground mb-1.5">Никнейм</label>
+              <label className="block text-sm font-semibold text-foreground mb-1.5">Имя или никнейм</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="ваш_никнейм"
+                placeholder="Ваше имя или @никнейм"
                 autoComplete="username"
                 autoFocus
                 className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors text-sm"

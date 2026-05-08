@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db, messagesTable, reactionsTable, usersTable } from "@workspace/db";
-import { eq, and, lt, desc } from "drizzle-orm";
+import { db, messagesTable, reactionsTable, usersTable, chatMembersTable } from "@workspace/db";
+import { eq, and, lt, desc, sql } from "drizzle-orm";
 import { SendMessageBody, EditMessageBody, AddReactionBody } from "@workspace/api-zod";
 
 const router = Router();
@@ -68,6 +68,66 @@ router.post("/messages", async (req, res) => {
     }).returning();
     const built = await buildMessage(msg);
     res.status(201).json(built);
+
+    // Auto-reply from bot if chat has a bot member
+    if (body.type === "text" && body.text) {
+      setImmediate(async () => {
+        try {
+          const members = await db.execute(
+            sql`SELECT u.id, u.is_bot, u.username FROM chat_members cm JOIN users u ON u.id = cm.user_id WHERE cm.chat_id = ${body.chatId} AND cm.user_id != ${uid}`
+          );
+          const bot = (members.rows as any[]).find(m => m.is_bot);
+          if (!bot) return;
+
+          const apiKey = process.env["DEEPSEEK_API_KEY"];
+          if (!apiKey) return;
+
+          const history = await db.select().from(messagesTable)
+            .where(eq(messagesTable.chatId, body.chatId))
+            .orderBy(desc(messagesTable.createdAt))
+            .limit(10);
+
+          const historyMessages = history.reverse().slice(0, -1).map((m: any) => ({
+            role: m.senderId === bot.id ? "assistant" : "user",
+            content: m.text || "",
+          })).filter((m: any) => m.content);
+
+          const systemPrompt = bot.username === "deepseek_ai"
+            ? "Ты — дружелюбный и умный ИИ-помощник в мессенджере Pulse. Отвечай кратко, по существу и преимущественно на русском языке. Ты умеешь помогать с любыми вопросами."
+            : "Ты — помощник службы поддержки мессенджера Pulse. Отвечай дружелюбно и по-русски. Помогай пользователям с вопросами по использованию приложения.";
+
+          const response = await fetch("https://api.deepseek.com/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model: "deepseek-chat",
+              messages: [
+                { role: "system", content: systemPrompt },
+                ...historyMessages,
+                { role: "user", content: body.text },
+              ],
+              max_tokens: 600,
+              temperature: 0.7,
+            }),
+          });
+
+          if (!response.ok) return;
+          const data = await response.json() as any;
+          const reply = data.choices?.[0]?.message?.content;
+          if (!reply) return;
+
+          await db.insert(messagesTable).values({
+            chatId: body.chatId,
+            senderId: bot.id,
+            text: reply,
+            type: "text",
+          });
+        } catch {}
+      });
+    }
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

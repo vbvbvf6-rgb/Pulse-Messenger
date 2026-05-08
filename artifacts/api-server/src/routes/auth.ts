@@ -14,14 +14,19 @@ router.post("/auth/login", async (req, res) => {
       return res.status(400).json({ error: "Укажите никнейм и пароль" });
     }
     const rows = await db.execute(
-      sql`SELECT id, username, display_name, avatar_color, avatar_url, bio, status, status_text, is_verified, is_bot, created_at, balance, password_hash FROM users WHERE username = ${String(username)}`
+      sql`SELECT id, username, display_name, avatar_color, avatar_url, bio, status, status_text, is_verified, is_bot, created_at, balance, password_hash
+          FROM users
+          WHERE LOWER(username) = LOWER(${String(username)})
+             OR LOWER(display_name) = LOWER(${String(username)})
+          ORDER BY CASE WHEN LOWER(username) = LOWER(${String(username)}) THEN 0 ELSE 1 END
+          LIMIT 1`
     );
     const user = rows.rows[0] as any;
     if (!user) {
-      return res.status(401).json({ error: "Неверный никнейм или пароль" });
+      return res.status(401).json({ error: "Неверное имя или пароль" });
     }
     if (!user.password_hash || user.password_hash !== hash(String(password))) {
-      return res.status(401).json({ error: "Неверный никнейм или пароль" });
+      return res.status(401).json({ error: "Неверное имя или пароль" });
     }
     res.json({
       userId: user.id,
@@ -47,7 +52,7 @@ router.post("/auth/login", async (req, res) => {
 
 router.post("/auth/register", async (req, res) => {
   try {
-    const { username, displayName, password } = req.body;
+    const { username, displayName, password, ageGroup } = req.body;
     if (!username || !displayName || !password) {
       return res.status(400).json({ error: "Заполните все поля" });
     }
@@ -69,8 +74,8 @@ router.post("/auth/register", async (req, res) => {
     const color = COLORS[Math.floor(Math.random() * COLORS.length)];
 
     const result = await db.execute(
-      sql`INSERT INTO users (username, display_name, avatar_color, status, password_hash, balance)
-          VALUES (${String(username)}, ${String(displayName)}, ${color}, 'online', ${hash(String(password))}, 0)
+      sql`INSERT INTO users (username, display_name, avatar_color, status, password_hash, balance, age_group)
+          VALUES (${String(username)}, ${String(displayName)}, ${color}, 'online', ${hash(String(password))}, 0, ${ageGroup ? String(ageGroup) : null})
           RETURNING id, username, display_name, avatar_color, status, created_at, balance`
     );
     const newUser = result.rows[0] as any;

@@ -417,6 +417,121 @@ export default function Wallet() {
 
         </div>
       </div>
+
+      {/* Receive Modal */}
+      <AnimatePresence>
+        {showReceiveModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setShowReceiveModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-card border border-border rounded-3xl p-6 w-full max-w-sm shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-foreground">Получить Spark</h3>
+                <button onClick={() => setShowReceiveModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-center">
+                  <span className="text-4xl">⚡</span>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-1">Ваш адрес кошелька</p>
+                  <div className="bg-background border border-border rounded-xl px-4 py-3 font-mono text-sm text-foreground select-all break-all text-center">
+                    PULSE-{wallet?.userId?.toString().padStart(6, "0") ?? "000000"}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">Передайте этот адрес отправителю для получения Spark</p>
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`PULSE-${wallet?.userId?.toString().padStart(6, "0") ?? "000000"}`);
+                    setShowReceiveModal(false);
+                  }}
+                  className="w-full py-3 bg-primary rounded-xl text-sm font-semibold text-white"
+                >
+                  Скопировать адрес
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Buy Modal */}
+      <AnimatePresence>
+        {showBuyModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setShowBuyModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-card border border-border rounded-3xl p-6 w-full max-w-sm shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-foreground">Купить Spark</h3>
+                <button onClick={() => setShowBuyModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { label: "Starter", amount: 100, price: "49 ₽", emoji: "⚡" },
+                  { label: "Popular", amount: 500, price: "199 ₽", emoji: "🔥", best: true },
+                  { label: "Premium", amount: 1500, price: "499 ₽", emoji: "💎" },
+                  { label: "Ultra", amount: 5000, price: "1499 ₽", emoji: "🚀" },
+                ].map((pkg) => (
+                  <button
+                    key={pkg.amount}
+                    disabled={buyLoading}
+                    onClick={async () => {
+                      setBuyLoading(true);
+                      await new Promise(r => setTimeout(r, 800));
+                      setBuyLoading(false);
+                      setShowBuyModal(false);
+                      alert(`Пополнение на ${pkg.amount} ⚡ через платёжный шлюз временно недоступно. Обратитесь к администратору.`);
+                    }}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
+                      pkg.best
+                        ? "border-primary/60 bg-primary/10 hover:bg-primary/15"
+                        : "border-border bg-background hover:border-primary/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{pkg.emoji}</span>
+                      <div className="text-left">
+                        <div className="text-sm font-bold text-foreground flex items-center gap-2">
+                          {pkg.label}
+                          {pkg.best && <span className="text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">Хит</span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{pkg.amount} ⚡ Spark</div>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-foreground">{pkg.price}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground text-center mt-4">Платёжная система находится в разработке</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import UserProfile from "@/pages/UserProfile";
 import Feed from "@/pages/Feed";
 import Wallet from "@/pages/Wallet";
 import Admin from "@/pages/Admin";
+import Prime from "@/pages/Prime";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -38,6 +39,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
             <Route path="/stories" component={Stories} />
             <Route path="/wallet" component={Wallet} />
             <Route path="/admin" component={Admin} />
+            <Route path="/prime" component={Prime} />
             <Route path="/profile" component={Profile} />
             <Route path="/settings" component={Settings} />
             <Route path="/user/:userId" component={UserProfile} />

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   MessageCircle,
@@ -14,6 +14,8 @@ import {
   LogOut,
   Shield,
   Sparkles,
+  HeadphonesIcon,
+  Crown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "@/contexts/AppContext";
@@ -66,13 +68,57 @@ function PremiumBadge() {
 }
 
 export function Sidebar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { logout } = useAppContext();
   const { data: me } = useGetMe();
+  const [isAdmin, setIsAdmin] = useState(ADMIN_USER_IDS.includes(me?.id ?? -1));
+
+  useEffect(() => {
+    const uid = localStorage.getItem("pulse-user-id");
+    if (!uid) return;
+    fetch("/api/admin/check", { headers: { "x-user-id": uid } })
+      .then(r => r.json())
+      .then(d => { if (d.isAdmin) setIsAdmin(true); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (me?.id && ADMIN_USER_IDS.includes(me.id)) setIsAdmin(true);
+  }, [me?.id]);
 
   const initial = me?.displayName?.[0]?.toUpperCase() || "U";
-  const isAdmin = ADMIN_USER_IDS.includes(me?.id ?? -1);
-  const isPremium = isAdmin;
+  const isPremium = (me as any)?.hasPrime ?? false;
+
+  const openSupportChat = async () => {
+    const uid = localStorage.getItem("pulse-user-id");
+    if (!uid) return;
+    try {
+      const usersRes = await fetch("/api/users/search?q=pulse_support", { headers: { "x-user-id": uid } });
+      let botUsers = usersRes.ok ? await usersRes.json() : [];
+      if (!botUsers.length) {
+        const aiRes = await fetch("/api/users/search?q=deepseek_ai", { headers: { "x-user-id": uid } });
+        botUsers = aiRes.ok ? await aiRes.json() : [];
+      }
+      if (!botUsers.length) { alert("Бот поддержки недоступен"); return; }
+      const bot = botUsers[0];
+      const chatRes = await fetch("/api/chats/direct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": uid },
+        body: JSON.stringify({ userId: bot.id }),
+      });
+      if (chatRes.ok) {
+        const chat = await chatRes.json();
+        navigate("/");
+        setTimeout(() => {
+          const stored = localStorage.getItem("pulse-selected-chat");
+          if (stored !== String(chat.id)) {
+            localStorage.setItem("pulse-support-open", String(chat.id));
+            window.dispatchEvent(new CustomEvent("open-chat", { detail: chat.id }));
+          }
+        }, 100);
+      }
+    } catch {}
+  };
 
   return (
     <div className="hidden md:flex w-16 lg:w-64 h-screen bg-card border-r border-border flex-col items-center lg:items-stretch py-4 flex-shrink-0">
@@ -111,20 +157,38 @@ export function Sidebar() {
           );
         })}
 
+        <Link
+          href="/prime"
+          className={cn(
+            "flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group relative border border-yellow-500/20",
+            location.startsWith("/prime")
+              ? "bg-yellow-500/20 text-yellow-300"
+              : "text-yellow-400/70 hover:bg-yellow-500/10 hover:text-yellow-300"
+          )}
+        >
+          <Crown size={22} className="transition-transform group-hover:scale-110 shrink-0" />
+          <span className="hidden lg:block font-medium truncate">Pulse Prime</span>
+        </Link>
+
+        <button
+          onClick={openSupportChat}
+          className="flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group relative text-muted-foreground hover:bg-secondary hover:text-foreground w-full text-left"
+        >
+          <HeadphonesIcon size={22} className="transition-transform group-hover:scale-110 shrink-0" />
+          <span className="hidden lg:block font-medium truncate">Поддержка</span>
+        </button>
+
         {isAdmin && (
           <Link
             href="/admin"
             className={cn(
-              "flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group relative mt-2 border border-purple-500/20",
+              "flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group relative border border-purple-500/20",
               location.startsWith("/admin")
                 ? "bg-purple-500/20 text-purple-300"
                 : "text-purple-400/70 hover:bg-purple-500/10 hover:text-purple-300"
             )}
           >
-            <Shield
-              size={22}
-              className="transition-transform group-hover:scale-110 shrink-0"
-            />
+            <Shield size={22} className="transition-transform group-hover:scale-110 shrink-0" />
             <span className="hidden lg:block font-medium truncate">Админ-панель</span>
           </Link>
         )}
