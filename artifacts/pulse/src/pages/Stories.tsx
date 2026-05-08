@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useGetStories, useCreateStory, getGetStoriesQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Play, Plus, X, Type, Image as ImageIcon } from "lucide-react";
+import { Play, Plus, X, Type, Image as ImageIcon, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
