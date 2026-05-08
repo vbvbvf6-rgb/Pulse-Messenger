@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { useGetPosts, useCreatePost, useLikePost, useCreatePostComment, useGetPostComments, Post } from "@workspace/api-client-react";
+import { useGetPosts, useGetMe, useCreatePost, useLikePost, useCreatePostComment, useGetPostComments, Post } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Heart, MessageCircle, Send, Image, X, Plus, Trash2, MoreVertical, ZoomIn } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -279,6 +279,7 @@ export default function Feed() {
   const [newPostText, setNewPostText] = useState("");
   const [newPostImage, setNewPostImage] = useState<string | null>(null);
   const { data: posts, isLoading } = useGetPosts();
+  const { data: me } = useGetMe();
   const createPost = useCreatePost();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -301,13 +302,44 @@ export default function Feed() {
     setNewPostText("");
     setNewPostImage(null);
     setShowCreatePost(false);
+
+    // Optimistic: show post immediately in the feed
+    const optimisticId = -Date.now();
+    const optimisticPost = {
+      id: optimisticId,
+      text: text || " ",
+      imageUrl: image || null,
+      likesCount: 0,
+      commentsCount: 0,
+      isLiked: false,
+      createdAt: new Date().toISOString(),
+      userId: currentUserId,
+      author: me ? {
+        id: me.id,
+        displayName: me.displayName,
+        username: (me as any).username,
+        avatarUrl: (me as any).avatarUrl || null,
+        avatarColor: me.avatarColor,
+        isVerified: (me as any).isVerified,
+      } : null,
+      _optimistic: true,
+    };
+
+    queryClient.setQueryData(["/api/posts"], (old: any) =>
+      Array.isArray(old) ? [optimisticPost, ...old] : [optimisticPost]
+    );
+
     try {
       await createPost.mutateAsync(
         { data: { text: text || " ", imageUrl: image || undefined } },
       );
-      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
     } catch {
-      // silently fail
+      // Remove optimistic post on failure
+      queryClient.setQueryData(["/api/posts"], (old: any) =>
+        Array.isArray(old) ? old.filter((p: any) => p.id !== optimisticId) : old
+      );
+    } finally {
+      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
     }
   };
 
