@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Crown, Zap, Check, Star, Shield, MessageCircle, Gift, Image, Infinity } from "lucide-react";
 import { useGetMe } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 
 const PLANS = [
   {
@@ -44,6 +45,7 @@ const FEATURES = [
 
 export default function Prime() {
   const { data: me } = useGetMe();
+  const { toast } = useToast();
   const [selected, setSelected] = useState("halfyear");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -56,7 +58,11 @@ export default function Prime() {
     await new Promise(r => setTimeout(r, 1200));
     setLoading(false);
     if (wallet < plan.spark) {
-      alert(`Недостаточно Spark. Нужно ${plan.spark} ⚡, у вас ${wallet} ⚡. Пополните кошелёк.`);
+      toast({
+        variant: "destructive",
+        title: "Недостаточно Spark ⚡",
+        description: `Нужно ${plan.spark} ⚡, у вас ${wallet} ⚡. Пополните кошелёк.`,
+      });
       return;
     }
     setSuccess(true);

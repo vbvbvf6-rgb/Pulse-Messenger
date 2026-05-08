@@ -5,6 +5,7 @@ import {
   History, Shield, ChevronRight, ArrowUpRight, ArrowDownLeft,
   AlertTriangle, CheckCircle2, TrendingUp, X, Package
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const TASK_CONFIGS: Record<string, { color: string; icon: React.ReactNode }> = {
   daily_login:    { color: "from-yellow-500 to-amber-500",   icon: <Zap size={20} className="text-white" /> },
@@ -90,6 +91,7 @@ async function verifyTask(taskId: string): Promise<{ ok: boolean; reason?: strin
 }
 
 export default function Wallet() {
+  const { toast } = useToast();
   const [balance, setBalance] = useState(0);
   const [walletAddress, setWalletAddress] = useState("");
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
@@ -448,13 +450,13 @@ export default function Wallet() {
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground mb-1">Ваш адрес кошелька</p>
                   <div className="bg-background border border-border rounded-xl px-4 py-3 font-mono text-sm text-foreground select-all break-all text-center">
-                    PULSE-{wallet?.userId?.toString().padStart(6, "0") ?? "000000"}
+                    PULSE-{uid ? uid.toString().padStart(6, "0") : "000000"}
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">Передайте этот адрес отправителю для получения Spark</p>
                 <button
                   onClick={() => {
-                    navigator.clipboard?.writeText(`PULSE-${wallet?.userId?.toString().padStart(6, "0") ?? "000000"}`);
+                    navigator.clipboard?.writeText(`PULSE-${uid ? uid.toString().padStart(6, "0") : "000000"}`);
                     setShowReceiveModal(false);
                   }}
                   className="w-full py-3 bg-primary rounded-xl text-sm font-semibold text-white"
@@ -505,7 +507,10 @@ export default function Wallet() {
                       await new Promise(r => setTimeout(r, 800));
                       setBuyLoading(false);
                       setShowBuyModal(false);
-                      alert(`Пополнение на ${pkg.amount} ⚡ через платёжный шлюз временно недоступно. Обратитесь к администратору.`);
+                      toast({
+                        title: "Платёжный шлюз недоступен",
+                        description: `Пополнение на ${pkg.amount} ⚡ временно недоступно. Обратитесь к администратору.`,
+                      });
                     }}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
                       pkg.best

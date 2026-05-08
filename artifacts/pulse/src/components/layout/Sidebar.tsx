@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import {
   MessageCircle,
   Phone,
@@ -71,6 +72,7 @@ export function Sidebar() {
   const [location, navigate] = useLocation();
   const { logout } = useAppContext();
   const { data: me } = useGetMe();
+  const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState(ADMIN_USER_IDS.includes(me?.id ?? -1));
 
   useEffect(() => {
@@ -99,7 +101,7 @@ export function Sidebar() {
         const aiRes = await fetch("/api/users/search?q=deepseek_ai", { headers: { "x-user-id": uid } });
         botUsers = aiRes.ok ? await aiRes.json() : [];
       }
-      if (!botUsers.length) { alert("Бот поддержки недоступен"); return; }
+      if (!botUsers.length) { toast({ variant: "destructive", title: "Бот недоступен", description: "Бот поддержки временно недоступен." }); return; }
       const bot = botUsers[0];
       const chatRes = await fetch("/api/chats/direct", {
         method: "POST",
