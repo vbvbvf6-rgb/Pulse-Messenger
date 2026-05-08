@@ -4,7 +4,7 @@ import {
   Shield, Zap, Users, TrendingUp, Send, CheckCircle, AlertTriangle, RefreshCw,
   Plus, Trash2, Key, BadgeCheck, X, ShieldCheck, ShieldOff, MessageSquare,
   PhoneCall, Gift, Crown, Megaphone, BarChart3, Activity, Star,
-  Edit3, Save, ChevronDown, ChevronRight, Minus
+  Edit3, Save, ChevronDown, ChevronRight, Minus, Ban, FileText, Trophy, Image
 } from "lucide-react";
 
 const ADMIN_USER_IDS = [4];
@@ -39,6 +39,35 @@ interface UserStats {
   giftsSent: number;
   giftsReceived: number;
   callsTotal: number;
+}
+
+interface AdminPost {
+  id: number;
+  text: string;
+  image_url: string | null;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  user_id: number;
+  username: string;
+  display_name: string;
+  avatar_color: string;
+  avatar_url: string | null;
+}
+
+interface LeaderEntry {
+  id: number;
+  username: string;
+  display_name: string;
+  avatar_color: string;
+  avatar_url: string | null;
+  score: number;
+}
+
+interface Leaderboard {
+  byBalance: LeaderEntry[];
+  byMessages: LeaderEntry[];
+  byGifts: LeaderEntry[];
 }
 
 function getHeader(): Record<string, string> {
@@ -108,9 +137,78 @@ export default function Admin() {
   const [editBio, setEditBio] = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
+  // Posts moderation
+  const [posts, setPosts] = useState<AdminPost[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [showPosts, setShowPosts] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
+
+  // Leaderboard
+  const [leaderboard, setLeaderboard] = useState<Leaderboard | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderTab, setLeaderTab] = useState<"byBalance" | "byMessages" | "byGifts">("byBalance");
+
+  // Ban
+  const [banLoading, setBanLoading] = useState(false);
+  const [bannedIds, setBannedIds] = useState<Set<number>>(new Set());
+
   const showToast = (msg: string, type: "ok" | "err") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const fetchPosts = async () => {
+    setPostsLoading(true);
+    try {
+      const res = await fetch("/api/admin/posts", { headers: getHeader() });
+      if (res.ok) setPosts(await res.json());
+    } catch {}
+    setPostsLoading(false);
+  };
+
+  const handleDeletePost = async (postId: number) => {
+    setDeletingPostId(postId);
+    try {
+      const res = await fetch(`/api/admin/posts/${postId}`, { method: "DELETE", headers: getHeader() });
+      if (res.ok) {
+        setPosts(prev => prev.filter(p => p.id !== postId));
+        showToast("🗑️ Пост удалён", "ok");
+      } else {
+        showToast("Ошибка удаления", "err");
+      }
+    } catch { showToast("Ошибка соединения", "err"); }
+    setDeletingPostId(null);
+  };
+
+  const fetchLeaderboard = async () => {
+    setLeaderboardLoading(true);
+    try {
+      const res = await fetch("/api/admin/leaderboard", { headers: getHeader() });
+      if (res.ok) setLeaderboard(await res.json());
+    } catch {}
+    setLeaderboardLoading(false);
+  };
+
+  const handleBanToggle = async (target: AdminUser) => {
+    const isBanned = bannedIds.has(target.id);
+    setBanLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${target.id}/ban`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ ban: !isBanned }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast(data.message, "ok");
+      setBannedIds(prev => {
+        const next = new Set(prev);
+        if (!isBanned) next.add(target.id); else next.delete(target.id);
+        return next;
+      });
+    } catch { showToast("Ошибка соединения", "err"); }
+    setBanLoading(false);
   };
 
   const fetchData = useCallback(async () => {
@@ -446,7 +544,7 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Tools row: Announcement + Mass SPARK */}
+        {/* Tools row: Announcement + Mass SPARK + Posts + Leaderboard */}
         <div className="grid md:grid-cols-2 gap-4">
           {/* Broadcast announcement */}
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -530,6 +628,128 @@ export default function Admin() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Posts Moderation + Leaderboard */}
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Posts moderation */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+            <button
+              onClick={() => { setShowPosts(v => !v); if (!showPosts && posts.length === 0) fetchPosts(); }}
+              className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                  <FileText size={18} className="text-blue-400" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">Модерация постов</p>
+                  <p className="text-xs text-muted-foreground">Просмотр и удаление постов ленты</p>
+                </div>
+              </div>
+              {showPosts ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+            </button>
+            {showPosts && (
+              <div className="border-t border-border max-h-80 overflow-y-auto">
+                <div className="p-2 border-b border-border flex justify-end">
+                  <button onClick={fetchPosts} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary transition-colors">
+                    <RefreshCw size={12} className={postsLoading ? "animate-spin" : ""} /> Обновить
+                  </button>
+                </div>
+                {postsLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="p-3 border-b border-border flex gap-3 animate-pulse">
+                      <div className="w-8 h-8 rounded-full bg-secondary shrink-0" />
+                      <div className="flex-1 space-y-2"><div className="h-3 bg-secondary rounded w-3/4" /><div className="h-2 bg-secondary rounded w-1/2" /></div>
+                    </div>
+                  ))
+                ) : posts.length === 0 ? (
+                  <p className="text-center text-muted-foreground text-sm py-8">Постов нет</p>
+                ) : posts.map(post => (
+                  <div key={post.id} className="p-3 border-b border-border flex gap-3 group hover:bg-secondary/30 transition-colors">
+                    <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-bold overflow-hidden" style={{ backgroundColor: post.avatar_color }}>
+                      {post.avatar_url ? <img src={post.avatar_url} alt="" className="w-full h-full object-cover" /> : post.display_name[0]?.toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">@{post.username}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{post.text}</p>
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                        {post.image_url && <span className="flex items-center gap-0.5"><Image size={9} /> фото</span>}
+                        <span>❤️ {post.likes_count}</span>
+                        <span>💬 {post.comments_count}</span>
+                        <span>{new Date(post.created_at).toLocaleDateString("ru-RU")}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeletePost(post.id)}
+                      disabled={deletingPostId === post.id}
+                      className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Leaderboard */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+            <button
+              onClick={() => { setShowLeaderboard(v => !v); if (!showLeaderboard && !leaderboard) fetchLeaderboard(); }}
+              className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                  <Trophy size={18} className="text-amber-400" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">Лидерборд</p>
+                  <p className="text-xs text-muted-foreground">Топ пользователей по категориям</p>
+                </div>
+              </div>
+              {showLeaderboard ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+            </button>
+            {showLeaderboard && (
+              <div className="border-t border-border p-4">
+                <div className="flex gap-1 mb-3 bg-secondary/50 rounded-xl p-1">
+                  {([["byBalance", "⚡ SPARK"], ["byMessages", "💬 Сообщ."], ["byGifts", "🎁 Подарки"]] as const).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => setLeaderTab(key)}
+                      className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${leaderTab === key ? "bg-card shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {leaderboardLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-2 py-2 animate-pulse">
+                      <div className="w-5 h-5 bg-secondary rounded" />
+                      <div className="w-7 h-7 bg-secondary rounded-full" />
+                      <div className="flex-1 h-3 bg-secondary rounded" />
+                    </div>
+                  ))
+                ) : leaderboard ? (
+                  <div className="space-y-2">
+                    {(leaderboard[leaderTab] || []).map((entry, idx) => (
+                      <div key={entry.id} className="flex items-center gap-2.5">
+                        <span className={`w-5 text-center text-xs font-black ${idx === 0 ? "text-amber-400" : idx === 1 ? "text-gray-400" : idx === 2 ? "text-orange-600" : "text-muted-foreground"}`}>
+                          {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `${idx + 1}`}
+                        </span>
+                        <div className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-white text-[10px] font-bold overflow-hidden" style={{ backgroundColor: entry.avatar_color }}>
+                          {entry.avatar_url ? <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" /> : entry.display_name[0]?.toUpperCase()}
+                        </div>
+                        <p className="flex-1 text-sm font-medium truncate">{entry.display_name}</p>
+                        <p className="text-sm font-black text-primary">{Number(entry.score).toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
         </div>
 
@@ -823,6 +1043,22 @@ export default function Admin() {
                         >
                           {selectedUser.is_admin ? <ShieldOff size={18} /> : <ShieldCheck size={18} />}
                           {selectedUser.is_admin ? "Снять права администратора" : "Выдать права администратора"}
+                        </button>
+                      )}
+
+                      {/* Ban / Unban */}
+                      {!ADMIN_USER_IDS.includes(selectedUser.id) && (
+                        <button
+                          onClick={() => handleBanToggle(selectedUser)}
+                          disabled={banLoading}
+                          className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-sm font-medium ${
+                            bannedIds.has(selectedUser.id)
+                              ? "bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20"
+                              : "bg-card border-border text-muted-foreground hover:border-orange-500/30 hover:text-orange-400"
+                          }`}
+                        >
+                          <Ban size={18} />
+                          {bannedIds.has(selectedUser.id) ? "Разблокировать пользователя" : "Заблокировать пользователя"}
                         </button>
                       )}
 

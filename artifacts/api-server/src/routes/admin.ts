@@ -280,6 +280,69 @@ router.patch("/admin/users/:userId", requireAdmin, async (req, res) => {
   }
 });
 
+// Posts moderation
+router.get("/admin/posts", requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.execute(
+      sql`SELECT p.id, p.text, p.image_url, p.likes_count, p.comments_count, p.created_at,
+                u.id as user_id, u.username, u.display_name, u.avatar_color, u.avatar_url
+          FROM posts p
+          LEFT JOIN users u ON u.id = p.user_id
+          ORDER BY p.created_at DESC LIMIT 100`
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.delete("/admin/posts/:postId", requireAdmin, async (req, res) => {
+  try {
+    const postId = Number(req.params.postId);
+    await db.execute(sql`DELETE FROM post_comments WHERE post_id = ${postId}`);
+    await db.execute(sql`DELETE FROM post_likes WHERE post_id = ${postId}`);
+    await db.execute(sql`DELETE FROM posts WHERE id = ${postId}`);
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// Leaderboard
+router.get("/admin/leaderboard", requireAdmin, async (req, res) => {
+  try {
+    const [byBalance, byMessages, byGifts] = await Promise.all([
+      db.execute(sql`SELECT id, username, display_name, avatar_color, avatar_url, balance as score FROM users WHERE is_bot = false ORDER BY balance DESC LIMIT 5`),
+      db.execute(sql`SELECT u.id, u.username, u.display_name, u.avatar_color, u.avatar_url, COUNT(m.id)::int as score FROM users u LEFT JOIN messages m ON m.sender_id = u.id WHERE u.is_bot = false GROUP BY u.id ORDER BY score DESC LIMIT 5`),
+      db.execute(sql`SELECT u.id, u.username, u.display_name, u.avatar_color, u.avatar_url, COUNT(g.id)::int as score FROM users u LEFT JOIN gifts g ON g.sender_id = u.id WHERE u.is_bot = false GROUP BY u.id ORDER BY score DESC LIMIT 5`),
+    ]);
+    res.json({ byBalance: byBalance.rows, byMessages: byMessages.rows, byGifts: byGifts.rows });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// Ban / Unban
+router.post("/admin/users/:userId/ban", requireAdmin, async (req, res) => {
+  try {
+    // Add is_banned column if not exists
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE`);
+    const targetId = Number(req.params.userId);
+    if (targetId === req.currentUserId) return res.status(400).json({ error: "Нельзя забанить себя" });
+    const { ban } = req.body;
+    await db.execute(sql`UPDATE users SET is_banned = ${!!ban} WHERE id = ${targetId}`);
+    const target = await db.execute(sql`SELECT username, is_banned FROM users WHERE id = ${targetId}`);
+    const row = target.rows[0] as any;
+    res.json({ success: true, isBanned: row?.is_banned ?? !!ban, message: ban ? `@${row?.username} заблокирован` : `@${row?.username} разблокирован` });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 router.get("/admin/check", async (req, res) => {
   try {
     const ok = await isAdminUser(req.currentUserId);
