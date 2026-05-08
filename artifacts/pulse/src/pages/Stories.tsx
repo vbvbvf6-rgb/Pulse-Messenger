@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useGetStories, useCreateStory, getGetStoriesQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Play, Plus, X, Type, Image as ImageIcon, Trash2 } from "lucide-react";
+import { Play, Plus, X, Type, Image as ImageIcon, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ export default function Stories() {
   const createStory = useCreateStory();
   const queryClient = useQueryClient();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [storyText, setStoryText] = useState("");
   const [storyBg, setStoryBg] = useState("#1a1a2e");
@@ -28,6 +29,15 @@ export default function Stories() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [viewingGroup, setViewingGroup] = useState<any>(null);
   const [viewingIndex, setViewingIndex] = useState(0);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setStoryImageUrl(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   const handleCreateStory = async () => {
     if (storyType === "text" && !storyText.trim()) return;
@@ -206,12 +216,23 @@ export default function Stories() {
                 autoFocus
               />
             ) : (
-              <input
-                value={storyImageUrl}
-                onChange={e => setStoryImageUrl(e.target.value)}
-                placeholder="URL изображения..."
-                className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary transition-colors"
-              />
+              <div className="space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-primary/40 text-sm font-medium text-primary hover:bg-primary/5 hover:border-primary transition-all"
+                >
+                  <Upload size={16} />
+                  {storyImageUrl ? "Сменить фото" : "Выбрать фото с устройства"}
+                </button>
+              </div>
             )}
 
             <div>
@@ -237,7 +258,7 @@ export default function Stories() {
               </button>
               <button
                 onClick={handleCreateStory}
-                disabled={isSubmitting || (storyType === "text" ? !storyText.trim() : !storyImageUrl.trim())}
+                disabled={isSubmitting || (storyType === "text" ? !storyText.trim() : !storyImageUrl)}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? "Публикую..." : "Опубликовать"}

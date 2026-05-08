@@ -1,9 +1,11 @@
 import React from "react";
 import { useGetStories } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLocation } from "wouter";
 
 export function StoriesBar() {
   const { data: stories, isLoading } = useGetStories();
+  const [, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -20,11 +22,11 @@ export function StoriesBar() {
 
   return (
     <div className="flex gap-4 p-4 overflow-x-auto scrollbar-none">
-      <div className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group">
+      <div onClick={() => setLocation("/stories")} className="flex flex-col items-center gap-1 shrink-0 cursor-pointer group">
         <div className="w-14 h-14 rounded-full bg-secondary flex items-center justify-center border-2 border-dashed border-muted-foreground group-hover:border-primary transition-colors text-muted-foreground group-hover:text-primary">
           <span className="text-2xl mb-1">+</span>
         </div>
-        <span className="text-xs text-muted-foreground font-medium">Add</span>
+        <span className="text-xs text-muted-foreground font-medium">История</span>
       </div>
 
       {stories?.map((storyGroup) => (

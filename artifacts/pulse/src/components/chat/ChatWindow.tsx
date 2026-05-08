@@ -168,7 +168,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
         </div>
 
         <div className="flex items-center gap-1 text-muted-foreground shrink-0">
-          {chat.type === "direct" && (
+          {chat.type === "direct" && !(chat.otherUser as any)?.isBot && (
             <>
               <button
                 onClick={() => handleStartCall("audio")}

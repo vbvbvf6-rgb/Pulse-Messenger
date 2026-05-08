@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Copy, Check, Trophy, Star, MessageSquare, Phone, Gift,
   History, Shield, ChevronRight, ArrowUpRight, ArrowDownLeft,
-  AlertTriangle, CheckCircle2, TrendingUp
+  AlertTriangle, CheckCircle2, TrendingUp, X, Package
 } from "lucide-react";
 
 const TASK_CONFIGS: Record<string, { color: string; icon: React.ReactNode }> = {
@@ -98,6 +98,9 @@ export default function Wallet() {
   const [txHistory, setTxHistory] = useState<TxEntry[]>([]);
   const [tab, setTab] = useState<"tasks" | "history">("tasks");
   const [addressCopied, setAddressCopied] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [buyLoading, setBuyLoading] = useState(false);
 
   const uid = Number(localStorage.getItem("pulse-user-id") || "0");
   const isAdmin = [4].includes(uid);
@@ -253,11 +256,17 @@ export default function Wallet() {
 
             {/* Action buttons */}
             <div className="flex gap-2 relative z-10">
-              <button className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition text-sm font-semibold flex items-center justify-center gap-1.5">
+              <button
+                onClick={() => setShowReceiveModal(true)}
+                className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 transition text-sm font-semibold flex items-center justify-center gap-1.5"
+              >
                 <ArrowDownLeft size={15} /> Получить
               </button>
-              <button className="flex-1 py-2.5 rounded-xl hover:opacity-90 transition text-sm font-semibold flex items-center justify-center gap-1.5"
-                style={{ background: "linear-gradient(135deg, #22d3ee, #7c3aed)" }}>
+              <button
+                onClick={() => setShowBuyModal(true)}
+                className="flex-1 py-2.5 rounded-xl hover:opacity-90 transition text-sm font-semibold flex items-center justify-center gap-1.5"
+                style={{ background: "linear-gradient(135deg, #22d3ee, #7c3aed)" }}
+              >
                 <Zap size={15} fill="white" /> Купить Spark
               </button>
             </div>

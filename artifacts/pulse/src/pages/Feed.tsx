@@ -1,13 +1,20 @@
 import React, { useState, useRef } from "react";
 import { useGetPosts, useCreatePost, useLikePost, useCreatePostComment, useGetPostComments, Post } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Heart, MessageCircle, Send, Image, X, Plus } from "lucide-react";
+import { Heart, MessageCircle, Send, Image, X, Plus, Trash2, MoreVertical } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
 import { useLocation } from "wouter";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const ADMIN_USER_IDS = [4];
+const getCurrentUserId = () => Number(localStorage.getItem("pulse-user-id") || "0");
 
 function VerifiedBadge() {
   return (
@@ -29,10 +36,26 @@ function AdminBadge() {
 function PostCard({ post }: { post: Post }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const likePost = useLikePost();
   const createComment = useCreatePostComment();
+  const currentUserId = getCurrentUserId();
+
+  const canDelete = post.author?.id === currentUserId || ADMIN_USER_IDS.includes(currentUserId);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await fetch(`/api/posts/${post.id}`, {
+        method: "DELETE",
+        headers: { "x-user-id": String(currentUserId) },
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
+    } catch {}
+    setIsDeleting(false);
+  };
   const { data: comments, refetch: refetchComments } = useGetPostComments(post.id, {
     query: { enabled: showComments }
   });
@@ -93,6 +116,25 @@ function PostCard({ post }: { post: Post }) {
             @{post.author?.username} · {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
           </p>
         </div>
+        {canDelete && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors shrink-0">
+                <MoreVertical size={16} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 size={14} className="mr-2" />
+                {isDeleting ? "Удаление..." : "Удалить пост"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       <div className="px-4 pb-3">
