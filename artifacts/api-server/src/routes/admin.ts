@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, messagesTable, chatsTable, chatMembersTable, giftsTable, callsTable } from "@workspace/db";
 import { eq, sql, ne } from "drizzle-orm";
 import { createHash } from "node:crypto";
 
@@ -26,7 +26,7 @@ async function requireAdmin(req: any, res: any, next: any) {
 router.get("/admin/users", requireAdmin, async (req, res) => {
   try {
     const rows = await db.execute(
-      sql`SELECT id, username, display_name, avatar_color, avatar_url, status, balance, created_at, is_verified, is_admin FROM users ORDER BY id`
+      sql`SELECT id, username, display_name, avatar_color, avatar_url, status, balance, created_at, is_verified, is_admin, is_bot, has_prime FROM users ORDER BY id`
     );
     res.json(rows.rows);
   } catch (err) {
@@ -48,14 +48,7 @@ router.post("/admin/give-currency", requireAdmin, async (req, res) => {
     const rows = await db.execute(sql`SELECT balance FROM users WHERE id = ${Number(userId)}`);
     const newBalance = Number((rows.rows[0] as any).balance);
 
-    res.json({
-      success: true,
-      userId: Number(userId),
-      username: target.username,
-      displayName: target.displayName,
-      amount,
-      newBalance,
-    });
+    res.json({ success: true, userId: Number(userId), username: target.username, displayName: target.displayName, amount, newBalance });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Ошибка сервера" });
@@ -82,12 +75,8 @@ router.post("/admin/set-balance", requireAdmin, async (req, res) => {
 router.post("/admin/reset-password", requireAdmin, async (req, res) => {
   try {
     const { userId, newPassword } = req.body;
-    if (!userId || !newPassword) {
-      return res.status(400).json({ error: "Укажите userId и newPassword" });
-    }
-    if (String(newPassword).length < 6) {
-      return res.status(400).json({ error: "Пароль должен быть не менее 6 символов" });
-    }
+    if (!userId || !newPassword) return res.status(400).json({ error: "Укажите userId и newPassword" });
+    if (String(newPassword).length < 6) return res.status(400).json({ error: "Пароль должен быть не менее 6 символов" });
     const target = await db.query.usersTable.findFirst({ where: eq(usersTable.id, Number(userId)) });
     if (!target) return res.status(404).json({ error: "Пользователь не найден" });
 
@@ -153,6 +142,118 @@ router.post("/admin/set-admin", requireAdmin, async (req, res) => {
   }
 });
 
+// NEW: Give/revoke Prime for a user
+router.post("/admin/give-prime", requireAdmin, async (req, res) => {
+  try {
+    const { userId, give, months } = req.body;
+    if (!userId) return res.status(400).json({ error: "Укажите userId" });
+    const target = await db.query.usersTable.findFirst({ where: eq(usersTable.id, Number(userId)) });
+    if (!target) return res.status(404).json({ error: "Пользователь не найден" });
+
+    if (give === false) {
+      await db.execute(sql`UPDATE users SET has_prime = false, prime_expires_at = NULL WHERE id = ${Number(userId)}`);
+      res.json({ success: true, hasPrime: false, message: `Prime снят у @${target.username}` });
+    } else {
+      const m = Number(months) || 1;
+      const expiresAt = new Date();
+      expiresAt.setMonth(expiresAt.getMonth() + m);
+      await db.execute(sql`UPDATE users SET has_prime = true, prime_expires_at = ${expiresAt.toISOString()} WHERE id = ${Number(userId)}`);
+      res.json({ success: true, hasPrime: true, primeExpiresAt: expiresAt.toISOString(), message: `Prime выдан @${target.username} на ${m} мес.` });
+    }
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// NEW: Mass-give SPARK to all users
+router.post("/admin/mass-give", requireAdmin, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (typeof amount !== "number" || amount === 0) {
+      return res.status(400).json({ error: "Укажите amount" });
+    }
+    await db.execute(sql`UPDATE users SET balance = GREATEST(0, balance + ${amount})`);
+    const totals = await db.execute(sql`SELECT COUNT(*) as cnt, SUM(balance) as total FROM users`);
+    const row = totals.rows[0] as any;
+    res.json({ success: true, usersAffected: Number(row.cnt), newTotalSpark: Number(row.total || 0) });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// NEW: Per-user activity stats
+router.get("/admin/users/:userId/stats", requireAdmin, async (req, res) => {
+  try {
+    const targetId = Number(req.params.userId);
+    const [msgRow, giftsSentRow, giftsRecvRow, callsRow] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*) as cnt FROM messages WHERE sender_id = ${targetId}`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM gifts WHERE sender_id = ${targetId}`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM gifts WHERE receiver_id = ${targetId}`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM calls WHERE caller_id = ${targetId} OR callee_id = ${targetId}`),
+    ]);
+    res.json({
+      messagesSent: Number((msgRow.rows[0] as any).cnt),
+      giftsSent: Number((giftsSentRow.rows[0] as any).cnt),
+      giftsReceived: Number((giftsRecvRow.rows[0] as any).cnt),
+      callsTotal: Number((callsRow.rows[0] as any).cnt),
+    });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// NEW: Send system announcement as bot to all users' bot chats
+router.post("/admin/announcement", requireAdmin, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !String(text).trim()) return res.status(400).json({ error: "Укажите текст объявления" });
+
+    // Find all direct chats that include bot user (id=1) and send a message
+    const botId = 1;
+    const botChats = await db.execute(
+      sql`SELECT DISTINCT c.id FROM chats c
+          JOIN chat_members cm1 ON cm1.chat_id = c.id AND cm1.user_id = ${botId}
+          JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_id != ${botId}
+          WHERE c.type = 'direct'`
+    );
+
+    let sent = 0;
+    for (const row of botChats.rows as any[]) {
+      await db.execute(
+        sql`INSERT INTO messages (chat_id, sender_id, type, content, created_at, updated_at)
+            VALUES (${row.id}, ${botId}, 'text', ${String(text).trim()}, NOW(), NOW())`
+      );
+      await db.execute(sql`UPDATE chats SET updated_at = NOW() WHERE id = ${row.id}`);
+      sent++;
+    }
+
+    res.json({ success: true, chatsSent: sent, message: `Объявление отправлено в ${sent} чат(ов)` });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// NEW: Edit user profile (display name, bio)
+router.patch("/admin/users/:userId", requireAdmin, async (req, res) => {
+  try {
+    const targetId = Number(req.params.userId);
+    const { displayName, bio } = req.body;
+    if (!displayName && bio === undefined) return res.status(400).json({ error: "Нечего обновлять" });
+
+    if (displayName) await db.execute(sql`UPDATE users SET display_name = ${displayName} WHERE id = ${targetId}`);
+    if (bio !== undefined) await db.execute(sql`UPDATE users SET bio = ${bio} WHERE id = ${targetId}`);
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 router.get("/admin/check", async (req, res) => {
   try {
     const ok = await isAdminUser(req.currentUserId);
@@ -164,13 +265,22 @@ router.get("/admin/check", async (req, res) => {
 
 router.get("/admin/stats", requireAdmin, async (req, res) => {
   try {
-    const totals = await db.execute(
-      sql`SELECT COUNT(*) as total_users, SUM(balance) as total_spark FROM users`
-    );
+    const [totals, msgs, chts, calls, gifts] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*) as total_users, SUM(balance) as total_spark, SUM(CASE WHEN has_prime THEN 1 ELSE 0 END) as prime_users FROM users`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM messages`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM chats`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM calls`),
+      db.execute(sql`SELECT COUNT(*) as cnt FROM gifts`),
+    ]);
     const row = totals.rows[0] as any;
     res.json({
       totalUsers: Number(row.total_users),
       totalSpark: Number(row.total_spark || 0),
+      primeUsers: Number(row.prime_users || 0),
+      totalMessages: Number((msgs.rows[0] as any).cnt),
+      totalChats: Number((chts.rows[0] as any).cnt),
+      totalCalls: Number((calls.rows[0] as any).cnt),
+      totalGifts: Number((gifts.rows[0] as any).cnt),
     });
   } catch (err) {
     req.log.error(err);

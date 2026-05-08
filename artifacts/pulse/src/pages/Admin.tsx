@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Zap, Users, TrendingUp, Send, CheckCircle, AlertTriangle, RefreshCw, Plus, Trash2, Key, BadgeCheck, X, ShieldCheck, ShieldOff } from "lucide-react";
+import {
+  Shield, Zap, Users, TrendingUp, Send, CheckCircle, AlertTriangle, RefreshCw,
+  Plus, Trash2, Key, BadgeCheck, X, ShieldCheck, ShieldOff, MessageSquare,
+  PhoneCall, Gift, Crown, Megaphone, BarChart3, Activity, Star,
+  Edit3, Save, ChevronDown, ChevronRight, Minus
+} from "lucide-react";
 
 const ADMIN_USER_IDS = [4];
 
@@ -15,16 +20,44 @@ interface AdminUser {
   created_at: string;
   is_verified: boolean;
   is_admin: boolean;
+  is_bot: boolean;
+  has_prime: boolean;
 }
 
 interface Stats {
   totalUsers: number;
   totalSpark: number;
+  primeUsers: number;
+  totalMessages: number;
+  totalChats: number;
+  totalCalls: number;
+  totalGifts: number;
+}
+
+interface UserStats {
+  messagesSent: number;
+  giftsSent: number;
+  giftsReceived: number;
+  callsTotal: number;
 }
 
 function getHeader(): Record<string, string> {
   const uid = localStorage.getItem("pulse-user-id");
   return uid ? { "x-user-id": uid } : {};
+}
+
+function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string | number; color: string }) {
+  return (
+    <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground font-medium">{label}</p>
+        <p className="text-xl font-black text-foreground">{typeof value === "number" ? value.toLocaleString() : value}</p>
+      </div>
+    </div>
+  );
 }
 
 export default function Admin() {
@@ -43,15 +76,37 @@ export default function Admin() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [userStatsLoading, setUserStatsLoading] = useState(false);
   const [giveAmount, setGiveAmount] = useState<string>("");
   const [giveLoading, setGiveLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"balance" | "password" | "actions">("balance");
+  const [activeTab, setActiveTab] = useState<"balance" | "password" | "actions" | "stats">("balance");
   const [newPassword, setNewPassword] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Mass SPARK
+  const [massAmount, setMassAmount] = useState("");
+  const [massLoading, setMassLoading] = useState(false);
+  const [showMassConfirm, setShowMassConfirm] = useState(false);
+
+  // Announcement
+  const [announcementText, setAnnouncementText] = useState("");
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
+  const [showAnnounce, setShowAnnounce] = useState(false);
+
+  // Prime
+  const [primeMonths, setPrimeMonths] = useState("1");
+  const [primeLoading, setPrimeLoading] = useState(false);
+
+  // Edit profile
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editBio, setEditBio] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   const showToast = (msg: string, type: "ok" | "err") => {
     setToast({ msg, type });
@@ -73,6 +128,30 @@ export default function Admin() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const fetchUserStats = async (uid: number) => {
+    setUserStatsLoading(true);
+    setUserStats(null);
+    try {
+      const res = await fetch(`/api/admin/users/${uid}/stats`, { headers: getHeader() });
+      if (res.ok) setUserStats(await res.json());
+    } catch {}
+    setUserStatsLoading(false);
+  };
+
+  const selectUser = (user: AdminUser) => {
+    setSelectedUser(user);
+    setActiveTab("balance");
+    setShowEditProfile(false);
+    setEditDisplayName(user.display_name);
+    setEditBio("");
+  };
+
+  useEffect(() => {
+    if (activeTab === "stats" && selectedUser) {
+      fetchUserStats(selectedUser.id);
+    }
+  }, [activeTab, selectedUser]);
+
   const handleGive = async (amount: number) => {
     if (!selectedUser) return;
     setGiveLoading(true);
@@ -84,7 +163,7 @@ export default function Admin() {
       });
       const data = await res.json();
       if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
-      showToast(`✅ ${amount > 0 ? "+" : ""}${amount} ⚡ SPARK → ${selectedUser.display_name}`, "ok");
+      showToast(`${amount > 0 ? "+" : ""}${amount} ⚡ → ${selectedUser.display_name}`, "ok");
       setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, balance: data.newBalance } : u));
       setSelectedUser(prev => prev ? { ...prev, balance: data.newBalance } : null);
       if (stats) setStats(prev => prev ? { ...prev, totalSpark: prev.totalSpark + amount } : null);
@@ -95,7 +174,7 @@ export default function Admin() {
 
   const handleCustomAmount = () => {
     const n = Number(giveAmount);
-    if (isNaN(n) || n === 0) return showToast("Введите корректную сумму (можно отрицательную)", "err");
+    if (isNaN(n) || n === 0) return showToast("Введите корректную сумму", "err");
     handleGive(n);
   };
 
@@ -110,7 +189,7 @@ export default function Admin() {
         body: JSON.stringify({ userId: selectedUser.id, newPassword }),
       });
       const data = await res.json();
-      if (!res.ok) { showToast(data.error || "Ошибка", "err"); }
+      if (!res.ok) showToast(data.error || "Ошибка", "err");
       else { showToast(`🔐 Пароль @${selectedUser.username} изменён`, "ok"); setNewPassword(""); }
     } catch { showToast("Ошибка соединения", "err"); }
     setPwLoading(false);
@@ -124,7 +203,7 @@ export default function Admin() {
         body: JSON.stringify({ userId: target.id, isVerified: !target.is_verified }),
       });
       if (res.ok) {
-        showToast(`${!target.is_verified ? "✅" : "❌"} Верификация ${!target.is_verified ? "выдана" : "снята"}: @${target.username}`, "ok");
+        showToast(`${!target.is_verified ? "✅ Верификация выдана" : "❌ Верификация снята"}: @${target.username}`, "ok");
         setUsers(prev => prev.map(u => u.id === target.id ? { ...u, is_verified: !target.is_verified } : u));
         setSelectedUser(prev => prev?.id === target.id ? { ...prev, is_verified: !target.is_verified } : prev);
       }
@@ -146,16 +225,32 @@ export default function Admin() {
     } catch { showToast("Ошибка", "err"); }
   };
 
+  const handleTogglePrime = async (give: boolean) => {
+    if (!selectedUser) return;
+    setPrimeLoading(true);
+    try {
+      const res = await fetch("/api/admin/give-prime", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ userId: selectedUser.id, give, months: Number(primeMonths) || 1 }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast(data.message, "ok");
+      setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, has_prime: give } : u));
+      setSelectedUser(prev => prev ? { ...prev, has_prime: give } : null);
+      if (stats) setStats(prev => prev ? { ...prev, primeUsers: prev.primeUsers + (give ? 1 : -1) } : null);
+    } catch { showToast("Ошибка соединения", "err"); }
+    setPrimeLoading(false);
+  };
+
   const handleDeleteUser = async () => {
     if (!deleteConfirm) return;
     setDeleteLoading(true);
     try {
-      const res = await fetch(`/api/admin/users/${deleteConfirm.id}`, {
-        method: "DELETE",
-        headers: getHeader(),
-      });
+      const res = await fetch(`/api/admin/users/${deleteConfirm.id}`, { method: "DELETE", headers: getHeader() });
       const data = await res.json();
-      if (!res.ok) { showToast(data.error || "Ошибка удаления", "err"); }
+      if (!res.ok) showToast(data.error || "Ошибка удаления", "err");
       else {
         showToast(`🗑️ @${deleteConfirm.username} удалён`, "ok");
         setUsers(prev => prev.filter(u => u.id !== deleteConfirm.id));
@@ -165,6 +260,63 @@ export default function Admin() {
       }
     } catch { showToast("Ошибка соединения", "err"); }
     setDeleteLoading(false);
+  };
+
+  const handleMassGive = async () => {
+    const n = Number(massAmount);
+    if (isNaN(n) || n === 0) return showToast("Введите корректную сумму", "err");
+    setMassLoading(true);
+    try {
+      const res = await fetch("/api/admin/mass-give", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ amount: n }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast(`⚡ ${n > 0 ? "+" : ""}${n} SPARK → ${data.usersAffected} пользователей`, "ok");
+      setMassAmount("");
+      setShowMassConfirm(false);
+      fetchData();
+    } catch { showToast("Ошибка соединения", "err"); }
+    setMassLoading(false);
+  };
+
+  const handleAnnouncement = async () => {
+    if (!announcementText.trim()) return;
+    setAnnouncementLoading(true);
+    try {
+      const res = await fetch("/api/admin/announcement", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ text: announcementText.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast(`📢 Отправлено в ${data.chatsSent} чат(ов)`, "ok");
+      setAnnouncementText("");
+      setShowAnnounce(false);
+    } catch { showToast("Ошибка соединения", "err"); }
+    setAnnouncementLoading(false);
+  };
+
+  const handleEditProfile = async () => {
+    if (!selectedUser || !editDisplayName.trim()) return;
+    setEditLoading(true);
+    try {
+      const res = await fetch(`/api/admin/users/${selectedUser.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ displayName: editDisplayName.trim(), bio: editBio }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast(`✏️ Профиль @${selectedUser.username} обновлён`, "ok");
+      setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, display_name: editDisplayName.trim() } : u));
+      setSelectedUser(prev => prev ? { ...prev, display_name: editDisplayName.trim() } : null);
+      setShowEditProfile(false);
+    } catch { showToast("Ошибка соединения", "err"); }
+    setEditLoading(false);
   };
 
   const filtered = users.filter(u =>
@@ -211,6 +363,7 @@ export default function Admin() {
         )}
       </AnimatePresence>
 
+      {/* Delete confirm dialog */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <motion.div
@@ -228,21 +381,40 @@ export default function Admin() {
               </div>
             </div>
             <p className="text-sm text-foreground mb-5">
-              Вы действительно хотите удалить <span className="font-bold">@{deleteConfirm.username}</span>? Все данные пользователя будут удалены.
+              Вы действительно хотите удалить <span className="font-bold">@{deleteConfirm.username}</span>?
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors"
-              >
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors">
                 Отмена
               </button>
-              <button
-                onClick={handleDeleteUser}
-                disabled={deleteLoading}
-                className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-bold hover:bg-destructive/90 transition-colors disabled:opacity-50"
-              >
+              <button onClick={handleDeleteUser} disabled={deleteLoading} className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground text-sm font-bold hover:bg-destructive/90 transition-colors disabled:opacity-50">
                 {deleteLoading ? "Удаляем..." : "Удалить"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Mass SPARK confirm */}
+      {showMassConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                <Zap size={20} className="text-yellow-400" />
+              </div>
+              <div>
+                <h3 className="font-bold">Массовая выдача SPARK</h3>
+                <p className="text-sm text-muted-foreground">Всем пользователям сразу</p>
+              </div>
+            </div>
+            <p className="text-sm mb-5">
+              Выдать <span className="font-bold text-primary">{Number(massAmount) > 0 ? "+" : ""}{massAmount} ⚡ SPARK</span> каждому из <span className="font-bold">{users.length}</span> пользователей?
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowMassConfirm(false)} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors">Отмена</button>
+              <button onClick={handleMassGive} disabled={massLoading} className="flex-1 py-2.5 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition-colors disabled:opacity-50">
+                {massLoading ? "..." : "Подтвердить"}
               </button>
             </div>
           </motion.div>
@@ -258,53 +430,123 @@ export default function Admin() {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
+
+        {/* Stats grid */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Users size={20} className="text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Пользователей</p>
-                <p className="text-2xl font-black text-foreground">{stats.totalUsers}</p>
-              </div>
-            </div>
-            <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center">
-                <Zap size={20} className="text-yellow-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">SPARK в обороте</p>
-                <p className="text-2xl font-black text-foreground">{stats.totalSpark.toLocaleString()}</p>
-              </div>
-            </div>
-            <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <TrendingUp size={20} className="text-blue-400" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">Средний баланс</p>
-                <p className="text-2xl font-black text-foreground">
-                  {stats.totalUsers > 0 ? Math.round(stats.totalSpark / stats.totalUsers).toLocaleString() : 0}
-                </p>
-              </div>
-            </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatCard icon={<Users size={20} className="text-primary" />} label="Пользователей" value={stats.totalUsers} color="bg-primary/10" />
+            <StatCard icon={<Zap size={20} className="text-yellow-400" />} label="SPARK в обороте" value={stats.totalSpark} color="bg-yellow-500/10" />
+            <StatCard icon={<Crown size={20} className="text-amber-400" />} label="Prime подписок" value={stats.primeUsers} color="bg-amber-500/10" />
+            <StatCard icon={<MessageSquare size={20} className="text-blue-400" />} label="Сообщений" value={stats.totalMessages} color="bg-blue-500/10" />
+            <StatCard icon={<Activity size={20} className="text-green-400" />} label="Чатов" value={stats.totalChats} color="bg-green-500/10" />
+            <StatCard icon={<PhoneCall size={20} className="text-cyan-400" />} label="Звонков" value={stats.totalCalls} color="bg-cyan-500/10" />
+            <StatCard icon={<Gift size={20} className="text-pink-400" />} label="Подарков" value={stats.totalGifts} color="bg-pink-500/10" />
+            <StatCard icon={<TrendingUp size={20} className="text-violet-400" />} label="Средний баланс" value={stats.totalUsers > 0 ? Math.round(stats.totalSpark / stats.totalUsers) : 0} color="bg-violet-500/10" />
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* Tools row: Announcement + Mass SPARK */}
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Broadcast announcement */}
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h2 className="font-bold text-foreground">Пользователи</h2>
+            <button
+              onClick={() => setShowAnnounce(v => !v)}
+              className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                  <Megaphone size={18} className="text-orange-400" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">Объявление всем</p>
+                  <p className="text-xs text-muted-foreground">Отправить сообщение от бота</p>
+                </div>
+              </div>
+              {showAnnounce ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+            </button>
+            {showAnnounce && (
+              <div className="px-4 pb-4 space-y-3 border-t border-border">
+                <textarea
+                  value={announcementText}
+                  onChange={e => setAnnouncementText(e.target.value)}
+                  placeholder="Текст объявления от DeepSeek AI..."
+                  rows={3}
+                  className="w-full mt-3 bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors resize-none"
+                />
+                <button
+                  onClick={handleAnnouncement}
+                  disabled={announcementLoading || !announcementText.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 transition-colors disabled:opacity-50"
+                >
+                  <Send size={14} />
+                  {announcementLoading ? "Отправляем..." : "Отправить объявление"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Mass SPARK */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+            <div className="p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                  <Zap size={18} className="text-yellow-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-sm">Массовая выдача SPARK</p>
+                  <p className="text-xs text-muted-foreground">Всем {users.length} пользователям сразу</p>
+                </div>
+              </div>
+              <div className="flex gap-2 mb-2">
+                {[100, 500, 1000].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setMassAmount(String(n))}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-all ${massAmount === String(n) ? "border-yellow-500 bg-yellow-500/10 text-yellow-400" : "border-border hover:border-yellow-500/40"}`}
+                  >
+                    +{n >= 1000 ? `${n/1000}k` : n}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={massAmount}
+                  onChange={e => setMassAmount(e.target.value)}
+                  placeholder="Сумма (отриц. = снять)"
+                  className="flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-yellow-500 transition-colors"
+                />
+                <button
+                  onClick={() => {
+                    const n = Number(massAmount);
+                    if (isNaN(n) || n === 0) return showToast("Введите корректную сумму", "err");
+                    setShowMassConfirm(true);
+                  }}
+                  disabled={!massAmount}
+                  className="px-4 py-2.5 rounded-xl bg-yellow-500 text-black font-bold text-sm hover:bg-yellow-400 transition-colors disabled:opacity-40"
+                >
+                  <Zap size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Users + Details */}
+        <div className="grid md:grid-cols-2 gap-5">
+          {/* User list */}
+          <div className="bg-card border border-border rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between gap-2">
+              <h2 className="font-bold text-foreground whitespace-nowrap">Пользователи</h2>
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Поиск..."
-                className="text-sm bg-background border border-border rounded-xl px-3 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary w-36 transition-colors"
+                className="text-sm bg-background border border-border rounded-xl px-3 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary w-full max-w-[160px] transition-colors"
               />
             </div>
-            <div className="divide-y divide-border max-h-[450px] overflow-y-auto">
+            <div className="divide-y divide-border max-h-[480px] overflow-y-auto">
               {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <div key={i} className="p-4 flex items-center gap-3 animate-pulse">
@@ -319,19 +561,19 @@ export default function Admin() {
                 <motion.button
                   key={user.id}
                   whileHover={{ backgroundColor: "rgba(255,255,255,0.03)" }}
-                  onClick={() => { setSelectedUser(user); setActiveTab("balance"); }}
+                  onClick={() => selectUser(user)}
                   className={`w-full p-4 flex items-center gap-3 text-left transition-colors ${selectedUser?.id === user.id ? "bg-primary/10 border-l-2 border-primary" : ""}`}
                 >
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden"
                     style={{ backgroundColor: user.avatar_color }}
                   >
-                    {user.avatar_url ? (
-                      <img src={user.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
-                    ) : user.display_name[0]?.toUpperCase()}
+                    {user.avatar_url
+                      ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
+                      : user.display_name[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <p className="font-semibold text-sm truncate">{user.display_name}</p>
                       {user.is_verified && (
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="shrink-0">
@@ -339,9 +581,9 @@ export default function Admin() {
                           <path d="M7 12l3.5 3.5L17 8" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       )}
-                      {ADMIN_USER_IDS.includes(user.id) && (
-                        <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">ADM</span>
-                      )}
+                      {user.has_prime && <Star size={10} className="text-amber-400 fill-amber-400 shrink-0" />}
+                      {user.is_admin && <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">ADM</span>}
+                      {user.is_bot && <span className="text-[8px] font-black uppercase px-1 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">BOT</span>}
                     </div>
                     <p className="text-xs text-muted-foreground">@{user.username}</p>
                   </div>
@@ -353,22 +595,20 @@ export default function Admin() {
             </div>
           </div>
 
+          {/* User detail panel */}
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
             {selectedUser ? (
-              <motion.div
-                key={selectedUser.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
+              <motion.div key={selectedUser.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                {/* User header */}
                 <div className="p-4 border-b border-border">
                   <div className="flex items-center gap-3">
                     <div
                       className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold shrink-0 overflow-hidden"
                       style={{ backgroundColor: selectedUser.avatar_color }}
                     >
-                      {selectedUser.avatar_url ? (
-                        <img src={selectedUser.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
-                      ) : selectedUser.display_name[0]?.toUpperCase()}
+                      {selectedUser.avatar_url
+                        ? <img src={selectedUser.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
+                        : selectedUser.display_name[0]?.toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -379,8 +619,9 @@ export default function Admin() {
                             <path d="M7 12l3.5 3.5L17 8" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         )}
+                        {selectedUser.has_prime && <Star size={13} className="text-amber-400 fill-amber-400" />}
                       </div>
-                      <p className="text-sm text-muted-foreground">@{selectedUser.username}</p>
+                      <p className="text-sm text-muted-foreground">@{selectedUser.username} · ID {selectedUser.id}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-xs text-muted-foreground">Баланс</p>
@@ -389,21 +630,26 @@ export default function Admin() {
                       </p>
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Регистрация: {new Date(selectedUser.created_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" })}
+                  </p>
                 </div>
 
-                <div className="flex border-b border-border">
-                  {(["balance", "password", "actions"] as const).map(t => (
+                {/* Tabs */}
+                <div className="flex border-b border-border overflow-x-auto">
+                  {(["balance", "password", "actions", "stats"] as const).map(t => (
                     <button
                       key={t}
                       onClick={() => setActiveTab(t)}
-                      className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === t ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap px-2 ${activeTab === t ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
                     >
-                      {t === "balance" ? "Баланс" : t === "password" ? "Пароль" : "Действия"}
+                      {t === "balance" ? "⚡ Баланс" : t === "password" ? "🔐 Пароль" : t === "actions" ? "⚙️ Действия" : "📊 Статистика"}
                     </button>
                   ))}
                 </div>
 
                 <div className="p-5">
+                  {/* Balance tab */}
                   {activeTab === "balance" && (
                     <>
                       <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Быстрая выдача ⚡ SPARK</p>
@@ -411,17 +657,30 @@ export default function Admin() {
                         {[50, 100, 500, 1000, 5000, 10000].map(amt => (
                           <motion.button
                             key={amt}
-                            whileHover={{ scale: 1.04 }}
-                            whileTap={{ scale: 0.96 }}
+                            whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                             onClick={() => handleGive(amt)}
                             disabled={giveLoading}
-                            className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-sm hover:bg-primary/20 transition-all disabled:opacity-50"
+                            className="flex items-center justify-center gap-1 py-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-sm hover:bg-primary/20 transition-all disabled:opacity-50"
                           >
                             <Plus size={12} /> {amt >= 1000 ? `${amt / 1000}k` : amt}
                           </motion.button>
                         ))}
                       </div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Произвольная сумма</p>
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Снять SPARK</p>
+                      <div className="grid grid-cols-3 gap-2 mb-4">
+                        {[50, 100, 500].map(amt => (
+                          <motion.button
+                            key={amt}
+                            whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                            onClick={() => handleGive(-amt)}
+                            disabled={giveLoading}
+                            className="flex items-center justify-center gap-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-bold text-sm hover:bg-red-500/20 transition-all disabled:opacity-50"
+                          >
+                            <Minus size={12} /> {amt}
+                          </motion.button>
+                        ))}
+                      </div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Произвольная сумма</p>
                       <div className="flex gap-2">
                         <input
                           type="number"
@@ -432,8 +691,7 @@ export default function Admin() {
                           onKeyDown={e => e.key === "Enter" && handleCustomAmount()}
                         />
                         <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
+                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                           onClick={handleCustomAmount}
                           disabled={giveLoading || !giveAmount}
                           className="px-4 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center gap-1.5"
@@ -445,6 +703,7 @@ export default function Admin() {
                     </>
                   )}
 
+                  {/* Password tab */}
                   {activeTab === "password" && (
                     <div className="space-y-3">
                       <p className="text-xs text-muted-foreground">Установить новый пароль для @{selectedUser.username}</p>
@@ -466,8 +725,44 @@ export default function Admin() {
                     </div>
                   )}
 
+                  {/* Actions tab */}
                   {activeTab === "actions" && (
                     <div className="space-y-3">
+                      {/* Edit profile */}
+                      <button
+                        onClick={() => setShowEditProfile(v => !v)}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-border text-muted-foreground hover:border-primary/30 hover:text-primary transition-all text-sm font-medium"
+                      >
+                        <Edit3 size={18} />
+                        Редактировать профиль
+                        {showEditProfile ? <ChevronDown size={15} className="ml-auto" /> : <ChevronRight size={15} className="ml-auto" />}
+                      </button>
+                      {showEditProfile && (
+                        <div className="space-y-2 p-3 bg-background/50 rounded-xl border border-border">
+                          <input
+                            value={editDisplayName}
+                            onChange={e => setEditDisplayName(e.target.value)}
+                            placeholder="Имя"
+                            className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
+                          />
+                          <input
+                            value={editBio}
+                            onChange={e => setEditBio(e.target.value)}
+                            placeholder="Биография (опционально)"
+                            className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
+                          />
+                          <button
+                            onClick={handleEditProfile}
+                            disabled={editLoading || !editDisplayName.trim()}
+                            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          >
+                            <Save size={14} />
+                            {editLoading ? "..." : "Сохранить"}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Verify */}
                       <button
                         onClick={() => handleToggleVerified(selectedUser)}
                         className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-sm font-medium ${
@@ -479,6 +774,44 @@ export default function Admin() {
                         <BadgeCheck size={18} />
                         {selectedUser.is_verified ? "Снять верификацию" : "Выдать верификацию ✓"}
                       </button>
+
+                      {/* Prime */}
+                      <div className={`p-3 rounded-xl border transition-all ${selectedUser.has_prime ? "bg-amber-500/10 border-amber-500/30" : "border-border"}`}>
+                        <div className="flex items-center gap-3 mb-2">
+                          <Crown size={18} className={selectedUser.has_prime ? "text-amber-400" : "text-muted-foreground"} />
+                          <span className={`text-sm font-medium ${selectedUser.has_prime ? "text-amber-400" : "text-muted-foreground"}`}>
+                            {selectedUser.has_prime ? "Prime активна" : "Prime не активна"}
+                          </span>
+                        </div>
+                        {!selectedUser.has_prime ? (
+                          <div className="flex gap-2">
+                            <select
+                              value={primeMonths}
+                              onChange={e => setPrimeMonths(e.target.value)}
+                              className="flex-1 bg-background border border-border rounded-xl px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-amber-500"
+                            >
+                              {[1, 3, 6, 12].map(m => <option key={m} value={m}>{m} мес.</option>)}
+                            </select>
+                            <button
+                              onClick={() => handleTogglePrime(true)}
+                              disabled={primeLoading}
+                              className="flex-1 py-1.5 rounded-xl bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                            >
+                              <Crown size={13} /> Выдать Prime
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleTogglePrime(false)}
+                            disabled={primeLoading}
+                            className="w-full py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold hover:bg-amber-500/30 transition-colors disabled:opacity-50"
+                          >
+                            {primeLoading ? "..." : "Отозвать Prime"}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Admin rights */}
                       {!ADMIN_USER_IDS.includes(selectedUser.id) && (
                         <button
                           onClick={() => handleToggleAdmin(selectedUser)}
@@ -492,20 +825,79 @@ export default function Admin() {
                           {selectedUser.is_admin ? "Снять права администратора" : "Выдать права администратора"}
                         </button>
                       )}
+
+                      {/* Delete */}
                       <button
                         onClick={() => setDeleteConfirm(selectedUser)}
                         className="w-full flex items-center gap-3 p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 transition-all text-sm font-medium"
                       >
-                        <Trash2 size={18} />
-                        Удалить пользователя
+                        <Trash2 size={18} /> Удалить пользователя
                       </button>
+                    </div>
+                  )}
+
+                  {/* Stats tab */}
+                  {activeTab === "stats" && (
+                    <div>
+                      {userStatsLoading ? (
+                        <div className="space-y-3">
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="h-14 bg-secondary/50 rounded-xl animate-pulse" />
+                          ))}
+                        </div>
+                      ) : userStats ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-center">
+                              <MessageSquare size={20} className="text-blue-400 mx-auto mb-1" />
+                              <p className="text-2xl font-black text-foreground">{userStats.messagesSent.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">Сообщений</p>
+                            </div>
+                            <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-3 text-center">
+                              <PhoneCall size={20} className="text-cyan-400 mx-auto mb-1" />
+                              <p className="text-2xl font-black text-foreground">{userStats.callsTotal.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">Звонков</p>
+                            </div>
+                            <div className="bg-pink-500/10 border border-pink-500/20 rounded-xl p-3 text-center">
+                              <Gift size={20} className="text-pink-400 mx-auto mb-1" />
+                              <p className="text-2xl font-black text-foreground">{userStats.giftsSent.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">Подарков отправлено</p>
+                            </div>
+                            <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-center">
+                              <Gift size={20} className="text-green-400 mx-auto mb-1" />
+                              <p className="text-2xl font-black text-foreground">{userStats.giftsReceived.toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">Подарков получено</p>
+                            </div>
+                          </div>
+                          <div className="bg-muted/30 rounded-xl p-3 text-xs text-muted-foreground space-y-1">
+                            <div className="flex justify-between">
+                              <span>Баланс</span>
+                              <span className="font-bold text-primary">{Number(selectedUser.balance).toLocaleString()} ⚡</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Prime</span>
+                              <span className={selectedUser.has_prime ? "text-amber-400 font-bold" : ""}>{selectedUser.has_prime ? "✓ Активна" : "Нет"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Верификация</span>
+                              <span className={selectedUser.is_verified ? "text-cyan-400 font-bold" : ""}>{selectedUser.is_verified ? "✓ Верифицирован" : "Нет"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Роль</span>
+                              <span>{selectedUser.is_admin ? "Администратор" : selectedUser.is_bot ? "Бот" : "Пользователь"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-center text-muted-foreground text-sm py-8">Не удалось загрузить статистику</p>
+                      )}
                     </div>
                   )}
                 </div>
               </motion.div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center py-16 text-muted-foreground p-5">
-                <Users size={48} className="mb-3 opacity-20" />
+                <BarChart3 size={48} className="mb-3 opacity-20" />
                 <p className="font-medium">Выберите пользователя</p>
                 <p className="text-sm opacity-60 mt-1">для управления аккаунтом</p>
               </div>
