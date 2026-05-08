@@ -1,0 +1,35 @@
+import React from "react";
+import { ChatList } from "@/components/chat/ChatList";
+import { ChatWindow } from "@/components/chat/ChatWindow";
+import { useAppContext } from "@/contexts/AppContext";
+
+export default function Home() {
+  const { selectedChatId } = useAppContext();
+
+  return (
+    <div className="flex w-full h-full">
+      <ChatList />
+      <div className="flex-1 hidden md:flex">
+        {selectedChatId ? (
+          <ChatWindow chatId={selectedChatId} />
+        ) : (
+          <div className="flex-1 flex items-center justify-center bg-background/50">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                <div className="w-8 h-8 bg-primary rounded-full" />
+              </div>
+              <h2 className="text-xl font-bold mb-2">Pulse Messenger</h2>
+              <p className="text-muted-foreground max-w-sm">Select a chat to start messaging, or search for a user to start a new conversation.</p>
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Mobile view logic can be added here to slide over */}
+      {selectedChatId && (
+        <div className="absolute inset-0 z-10 md:hidden bg-background">
+          <ChatWindow chatId={selectedChatId} />
+        </div>
+      )}
+    </div>
+  );
+}

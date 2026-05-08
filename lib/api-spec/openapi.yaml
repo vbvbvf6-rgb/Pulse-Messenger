@@ -3,20 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Pulse Messenger API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: users
+    description: User operations
+  - name: chats
+    description: Chat operations
+  - name: messages
+    description: Message operations
+  - name: calls
+    description: Call operations
+  - name: gifts
+    description: Gift operations
+  - name: stories
+    description: Stories operations
+  - name: contacts
+    description: Contact operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +38,605 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      operationId: updateMe
+      tags: [users]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/search:
+    get:
+      operationId: searchUsers
+      tags: [users]
+      summary: Search users by username or name
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{userId}:
+    get:
+      operationId: getUserById
+      tags: [users]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /contacts:
+    get:
+      operationId: getContacts
+      tags: [contacts]
+      summary: Get user contacts
+      responses:
+        "200":
+          description: Contacts list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: addContact
+      tags: [contacts]
+      summary: Add a contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddContactBody"
+      responses:
+        "201":
+          description: Contact added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /contacts/{contactId}:
+    delete:
+      operationId: removeContact
+      tags: [contacts]
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Contact removed
+
+  /chats:
+    get:
+      operationId: getChats
+      tags: [chats]
+      summary: Get all chats for current user
+      responses:
+        "200":
+          description: List of chats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Chat"
+    post:
+      operationId: createChat
+      tags: [chats]
+      summary: Create a new chat or group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChatBody"
+      responses:
+        "201":
+          description: Created chat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+
+  /chats/{chatId}:
+    get:
+      operationId: getChatById
+      tags: [chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chat details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+    put:
+      operationId: updateChat
+      tags: [chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateChatBody"
+      responses:
+        "200":
+          description: Updated chat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+    delete:
+      operationId: deleteChat
+      tags: [chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Chat deleted
+
+  /chats/{chatId}/members:
+    get:
+      operationId: getChatMembers
+      tags: [chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMember"
+    post:
+      operationId: addChatMember
+      tags: [chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberBody"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMember"
+
+  /chats/{chatId}/members/{memberId}:
+    delete:
+      operationId: removeChatMember
+      tags: [chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Member removed
+
+  /chats/{chatId}/pin:
+    put:
+      operationId: pinChat
+      tags: [chats]
+      parameters:
+        - name: chatId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chat pinned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chat"
+
+  /messages:
+    get:
+      operationId: getMessages
+      tags: [messages]
+      summary: Get messages for a chat
+      parameters:
+        - name: chatId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: before
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /messages/{messageId}:
+    put:
+      operationId: editMessage
+      tags: [messages]
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditMessageBody"
+      responses:
+        "200":
+          description: Edited message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+    delete:
+      operationId: deleteMessage
+      tags: [messages]
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Message deleted
+
+  /messages/{messageId}/reactions:
+    post:
+      operationId: addReaction
+      tags: [messages]
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddReactionBody"
+      responses:
+        "201":
+          description: Reaction added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reaction"
+    delete:
+      operationId: removeReaction
+      tags: [messages]
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddReactionBody"
+      responses:
+        "204":
+          description: Reaction removed
+
+  /calls:
+    get:
+      operationId: getCallHistory
+      tags: [calls]
+      summary: Get call history
+      responses:
+        "200":
+          description: Call history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Call"
+    post:
+      operationId: initiateCall
+      tags: [calls]
+      summary: Initiate a call
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitiateCallBody"
+      responses:
+        "201":
+          description: Call initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Call"
+
+  /calls/{callId}:
+    get:
+      operationId: getCallById
+      tags: [calls]
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Call details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Call"
+    put:
+      operationId: updateCallStatus
+      tags: [calls]
+      parameters:
+        - name: callId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCallBody"
+      responses:
+        "200":
+          description: Updated call
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Call"
+
+  /gifts:
+    get:
+      operationId: getGiftCatalog
+      tags: [gifts]
+      summary: Get available gift catalog
+      responses:
+        "200":
+          description: Gift catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GiftItem"
+
+  /gifts/sent:
+    get:
+      operationId: getSentGifts
+      tags: [gifts]
+      summary: Get gifts sent by current user
+      responses:
+        "200":
+          description: Sent gifts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Gift"
+
+  /gifts/received:
+    get:
+      operationId: getReceivedGifts
+      tags: [gifts]
+      summary: Get gifts received by current user
+      responses:
+        "200":
+          description: Received gifts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Gift"
+
+  /gifts/send:
+    post:
+      operationId: sendGift
+      tags: [gifts]
+      summary: Send a gift to a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendGiftBody"
+      responses:
+        "201":
+          description: Gift sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gift"
+
+  /stories:
+    get:
+      operationId: getStories
+      tags: [stories]
+      summary: Get stories from contacts
+      responses:
+        "200":
+          description: Stories list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoryGroup"
+    post:
+      operationId: createStory
+      tags: [stories]
+      summary: Create a story
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStoryBody"
+      responses:
+        "201":
+          description: Story created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Story"
+
+  /stories/{storyId}:
+    delete:
+      operationId: deleteStory
+      tags: [stories]
+      parameters:
+        - name: storyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Story deleted
+
+  /stats/me:
+    get:
+      operationId: getMyStats
+      tags: [users]
+      summary: Get current user stats (messages sent, calls made, gifts)
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +647,526 @@ components:
       required:
         - status
 
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        displayName:
+          type: string
+        bio:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        avatarColor:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, away]
+        lastSeen:
+          type: string
+          nullable: true
+        phoneNumber:
+          type: string
+          nullable: true
+        isBot:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - username
+        - displayName
+        - avatarColor
+        - status
+        - isBot
+        - createdAt
+
+    UpdateUserBody:
+      type: object
+      properties:
+        displayName:
+          type: string
+        bio:
+          type: string
+        avatarUrl:
+          type: string
+        status:
+          type: string
+          enum: [online, offline, away]
+
+    AddContactBody:
+      type: object
+      properties:
+        userId:
+          type: integer
+      required:
+        - userId
+
+    Chat:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [direct, group, channel]
+        name:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        avatarColor:
+          type: string
+        isPinned:
+          type: boolean
+        isMuted:
+          type: boolean
+        unreadCount:
+          type: integer
+        lastMessage:
+          $ref: "#/components/schemas/Message"
+          nullable: true
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMember"
+        otherUser:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - type
+        - avatarColor
+        - isPinned
+        - isMuted
+        - unreadCount
+        - createdAt
+        - updatedAt
+
+    CreateChatBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [direct, group, channel]
+        name:
+          type: string
+        description:
+          type: string
+        memberIds:
+          type: array
+          items:
+            type: integer
+      required:
+        - type
+
+    UpdateChatBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        avatarUrl:
+          type: string
+        isMuted:
+          type: boolean
+
+    ChatMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        chatId:
+          type: integer
+        userId:
+          type: integer
+        role:
+          type: string
+          enum: [owner, admin, member]
+        joinedAt:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - id
+        - chatId
+        - userId
+        - role
+        - joinedAt
+
+    AddMemberBody:
+      type: object
+      properties:
+        userId:
+          type: integer
+        role:
+          type: string
+          enum: [admin, member]
+          default: member
+      required:
+        - userId
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        chatId:
+          type: integer
+        senderId:
+          type: integer
+        text:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: [text, image, video, audio, file, gift, call, sticker, system]
+        mediaUrl:
+          type: string
+          nullable: true
+        replyToId:
+          type: integer
+          nullable: true
+        isEdited:
+          type: boolean
+        isRead:
+          type: boolean
+        reactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Reaction"
+        sender:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        replyTo:
+          $ref: "#/components/schemas/Message"
+          nullable: true
+        giftData:
+          $ref: "#/components/schemas/Gift"
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - chatId
+        - senderId
+        - type
+        - isEdited
+        - isRead
+        - reactions
+        - createdAt
+        - updatedAt
+
+    SendMessageBody:
+      type: object
+      properties:
+        chatId:
+          type: integer
+        text:
+          type: string
+        type:
+          type: string
+          enum: [text, image, video, audio, file, sticker]
+          default: text
+        mediaUrl:
+          type: string
+        replyToId:
+          type: integer
+      required:
+        - chatId
+
+    EditMessageBody:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text
+
+    Reaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        messageId:
+          type: integer
+        userId:
+          type: integer
+        emoji:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - messageId
+        - userId
+        - emoji
+        - createdAt
+
+    AddReactionBody:
+      type: object
+      properties:
+        emoji:
+          type: string
+      required:
+        - emoji
+
+    Call:
+      type: object
+      properties:
+        id:
+          type: integer
+        chatId:
+          type: integer
+          nullable: true
+        callerId:
+          type: integer
+        calleeId:
+          type: integer
+          nullable: true
+        type:
+          type: string
+          enum: [audio, video, group]
+        status:
+          type: string
+          enum: [ringing, active, ended, missed, declined]
+        startedAt:
+          type: string
+          nullable: true
+        endedAt:
+          type: string
+          nullable: true
+        durationSeconds:
+          type: integer
+          nullable: true
+        caller:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        callee:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - callerId
+        - type
+        - status
+        - createdAt
+
+    InitiateCallBody:
+      type: object
+      properties:
+        calleeId:
+          type: integer
+        chatId:
+          type: integer
+        type:
+          type: string
+          enum: [audio, video, group]
+      required:
+        - type
+
+    UpdateCallBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, ended, declined]
+      required:
+        - status
+
+    GiftItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        emoji:
+          type: string
+        animationType:
+          type: string
+          enum: [confetti, sparkle, hearts, fireworks, stars, balloons, roses, diamonds]
+        rarity:
+          type: string
+          enum: [common, rare, epic, legendary]
+        stars:
+          type: integer
+        description:
+          type: string
+      required:
+        - id
+        - name
+        - emoji
+        - animationType
+        - rarity
+        - stars
+        - description
+
+    Gift:
+      type: object
+      properties:
+        id:
+          type: integer
+        giftItemId:
+          type: integer
+        senderId:
+          type: integer
+        receiverId:
+          type: integer
+        message:
+          type: string
+          nullable: true
+        isAnonymous:
+          type: boolean
+        giftItem:
+          $ref: "#/components/schemas/GiftItem"
+          nullable: true
+        sender:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        receiver:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - giftItemId
+        - senderId
+        - receiverId
+        - isAnonymous
+        - createdAt
+
+    SendGiftBody:
+      type: object
+      properties:
+        receiverId:
+          type: integer
+        giftItemId:
+          type: integer
+        message:
+          type: string
+        isAnonymous:
+          type: boolean
+          default: false
+        chatId:
+          type: integer
+      required:
+        - receiverId
+        - giftItemId
+
+    Story:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        mediaUrl:
+          type: string
+        type:
+          type: string
+          enum: [image, video, text]
+        text:
+          type: string
+          nullable: true
+        backgroundColor:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+        viewCount:
+          type: integer
+        isViewed:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - type
+        - expiresAt
+        - viewCount
+        - isViewed
+        - createdAt
+
+    StoryGroup:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        stories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Story"
+        hasUnviewed:
+          type: boolean
+      required:
+        - user
+        - stories
+        - hasUnviewed
+
+    CreateStoryBody:
+      type: object
+      properties:
+        mediaUrl:
+          type: string
+        type:
+          type: string
+          enum: [image, video, text]
+        text:
+          type: string
+        backgroundColor:
+          type: string
+      required:
+        - type
+
+    UserStats:
+      type: object
+      properties:
+        messagesSent:
+          type: integer
+        callsMade:
+          type: integer
+        callDurationSeconds:
+          type: integer
+        giftsSent:
+          type: integer
+        giftsReceived:
+          type: integer
+        chatsCount:
+          type: integer
+        contactsCount:
+          type: integer
+      required:
+        - messagesSent
+        - callsMade
+        - callDurationSeconds
+        - giftsSent
+        - giftsReceived
+        - chatsCount
+        - contactsCount
