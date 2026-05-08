@@ -1,10 +1,88 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Message } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, X, Info } from "lucide-react";
+import { Check, CheckCheck, X, Info, Play, Pause, Mic } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+function VoicePlayer({ src, durationSec, isMine }: { src: string; durationSec: number; isMine: boolean }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentSec, setCurrentSec] = useState(0);
+
+  const toggle = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (playing) { a.pause(); } else { a.play(); }
+    setPlaying(!playing);
+  };
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const onTime = () => {
+      setCurrentSec(Math.floor(a.currentTime));
+      setProgress(a.duration ? (a.currentTime / a.duration) * 100 : 0);
+    };
+    const onEnd = () => { setPlaying(false); setProgress(0); setCurrentSec(0); };
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("ended", onEnd);
+    return () => { a.removeEventListener("timeupdate", onTime); a.removeEventListener("ended", onEnd); };
+  }, []);
+
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+  const displayDur = playing ? currentSec : durationSec;
+
+  const bars = Array.from({ length: 28 }, (_, i) => {
+    const h = 20 + Math.sin(i * 1.3 + 1) * 12 + Math.cos(i * 0.7) * 8;
+    const filled = (i / 28) * 100 < progress;
+    return { h: Math.max(6, h), filled };
+  });
+
+  return (
+    <div className="flex items-center gap-3 min-w-[200px]">
+      <audio ref={audioRef} src={src} preload="metadata" />
+      <button
+        onClick={toggle}
+        className={cn(
+          "w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-all",
+          isMine
+            ? "bg-white/20 hover:bg-white/30 text-white"
+            : "bg-primary/20 hover:bg-primary/30 text-primary"
+        )}
+      >
+        {playing ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+      </button>
+
+      <div className="flex-1 flex flex-col gap-1.5">
+        <div className="flex items-end gap-[2px] h-7">
+          {bars.map((bar, i) => (
+            <motion.div
+              key={i}
+              animate={playing ? { scaleY: [1, 1.4, 0.8, 1.2, 1], } : { scaleY: 1 }}
+              transition={playing ? { duration: 0.6, repeat: Infinity, delay: i * 0.03, ease: "easeInOut" } : {}}
+              style={{ height: bar.h }}
+              className={cn(
+                "w-[3px] rounded-full transition-colors origin-bottom",
+                bar.filled
+                  ? isMine ? "bg-white" : "bg-primary"
+                  : isMine ? "bg-white/40" : "bg-muted-foreground/40"
+              )}
+            />
+          ))}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Mic size={10} className={isMine ? "text-white/60" : "text-muted-foreground"} />
+          <span className={cn("text-[11px] font-mono", isMine ? "text-white/70" : "text-muted-foreground")}>
+            {fmt(displayDur)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function MessageBubble({ message }: { message: Message }) {
   const { currentUserId } = useAppContext();
@@ -125,8 +203,12 @@ export function MessageBubble({ message }: { message: Message }) {
             {message.text && <p className="text-sm mt-2 px-1">{message.text}</p>}
           </div>
         );
+      case "audio": {
+        const durSec = parseInt((message.text || "voice:0").replace("voice:", "")) || 0;
+        return <VoicePlayer src={message.mediaUrl || ""} durationSec={durSec} isMine={isMine} />;
+      }
       case "call":
-        return <p className="text-sm font-medium italic opacity-80">📞 Call ended</p>;
+        return <p className="text-sm font-medium italic opacity-80">📞 Звонок завершён</p>;
       default:
         return <p className="text-sm">[{message.type}] {message.text}</p>;
     }
