@@ -158,13 +158,40 @@ export default function Settings() {
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      setAvatarUrl(result);
-    };
-    reader.readAsDataURL(file);
     e.target.value = "";
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      const MAX = 400;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const compressed = canvas.toDataURL("image/jpeg", 0.75);
+      setAvatarUrl(compressed);
+      // Auto-save avatar immediately
+      const uid = localStorage.getItem("pulse-user-id");
+      fetch("/api/users/me", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(uid ? { "x-user-id": uid } : {}),
+        },
+        body: JSON.stringify({ avatarUrl: compressed }),
+      })
+        .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+          toast({ title: lang === "ru" ? "Фото обновлено" : "Photo updated" });
+        })
+        .catch(() => {
+          toast({ title: t("settings.saveError"), variant: "destructive" });
+        });
+    };
+    img.src = objectUrl;
   };
 
   const handleCancelPrime = async () => {
