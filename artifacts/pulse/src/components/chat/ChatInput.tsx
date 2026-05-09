@@ -484,7 +484,7 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
 
       {/* Main input bar */}
       {!isRecording && !audioBlob && (
-        <form onSubmit={handleSend} className={`flex items-center gap-2 bg-secondary rounded-2xl px-3 py-2 border transition-colors focus-within:border-primary/50 ${editMessage ? "border-amber-500/30" : "border-border"}`}>
+        <form onSubmit={handleSend} className={`flex items-end gap-2 bg-secondary rounded-2xl px-3 py-2 border transition-colors focus-within:border-primary/50 ${editMessage ? "border-amber-500/30" : "border-border"}`}>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />
 
           {!editMessage && (
