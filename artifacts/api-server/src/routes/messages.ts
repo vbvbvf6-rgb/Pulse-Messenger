@@ -236,14 +236,17 @@ router.post("/messages", async (req, res) => {
           };
 
           const callPollinations = async (model: string) => {
-            const r = await fetch("https://text.pollinations.ai/openai", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ model, messages: chatPayload, max_tokens: 500 }),
-            });
+            const conversationText = historyMessages
+              .map((m: any) => `${m.role === "assistant" ? "Assistant" : "User"}: ${m.content}`)
+              .join("\n");
+            const fullPrompt = conversationText
+              ? `${conversationText}\nUser: ${body.text}\nAssistant:`
+              : body.text;
+            const url = `https://text.pollinations.ai/${encodeURIComponent(fullPrompt)}?model=${model}&system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 99999)}`;
+            const r = await fetch(url, { method: "GET" });
             if (!r.ok) return undefined;
-            const data = await r.json();
-            return data.choices?.[0]?.message?.content as string | undefined;
+            const text = await r.text();
+            return text?.trim() || undefined;
           };
 
           if (process.env.DEEPSEEK_API_KEY) {
@@ -258,8 +261,8 @@ router.post("/messages", async (req, res) => {
             });
           }
 
-          if (!reply) reply = await tryWithTimeout(() => callPollinations("openai"));
-          if (!reply) reply = await tryWithTimeout(() => callPollinations("mistral"));
+          if (!reply) reply = await tryWithTimeout(() => callPollinations("openai"), 18000);
+          if (!reply) reply = await tryWithTimeout(() => callPollinations("mistral"), 18000);
 
           if (!reply || typeof reply !== "string" || !reply.trim()) return;
 
