@@ -117,9 +117,13 @@ router.get("/users/search", async (req, res) => {
 
 router.get("/users/:userId", async (req, res) => {
   try {
+    const requesterId = req.currentUserId;
     const userId = Number(req.params.userId);
     const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
     if (!user) return res.status(404).json({ error: "User not found" });
+    if (userId !== requesterId && !(user as any).showOnlineStatus) {
+      return res.json({ ...user, status: "offline", lastSeen: null });
+    }
     res.json(user);
   } catch (err) {
     req.log.error(err);

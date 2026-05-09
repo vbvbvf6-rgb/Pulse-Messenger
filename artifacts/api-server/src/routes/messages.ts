@@ -249,12 +249,17 @@ router.post("/messages", async (req, res) => {
             return text?.trim() || undefined;
           };
 
-          if (process.env.DEEPSEEK_API_KEY) {
+          if (process.env.OPENROUTER_API_KEY) {
             reply = await tryWithTimeout(async () => {
-              const r = await fetch("https://api.deepseek.com/chat/completions", {
+              const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
-                body: JSON.stringify({ model: "deepseek-chat", messages: chatPayload, max_tokens: 500 }),
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                  "HTTP-Referer": "https://pulse-messenger.replit.app",
+                  "X-Title": "Pulse Messenger",
+                },
+                body: JSON.stringify({ model: "deepseek/deepseek-chat-v3-0324:free", messages: chatPayload, max_tokens: 500 }),
               });
               const data = await r.json();
               return data.choices?.[0]?.message?.content as string | undefined;
@@ -277,6 +282,58 @@ router.post("/messages", async (req, res) => {
         } catch {}
       });
     }
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/messages/schedule", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const primeRow = await db.execute(sql`SELECT has_prime, prime_expires_at FROM users WHERE id = ${uid}`);
+    const pu = primeRow.rows[0] as any;
+    const hasPrime = (pu?.has_prime === true || pu?.has_prime === "t") && pu?.prime_expires_at && new Date(pu.prime_expires_at) > new Date();
+    if (!hasPrime) return res.status(403).json({ error: "Отложенная отправка доступна только для Pulse Prime участников" });
+
+    const { chatId, text, scheduledAt } = req.body;
+    if (!chatId || !text || !scheduledAt) return res.status(400).json({ error: "chatId, text и scheduledAt обязательны" });
+    const date = new Date(scheduledAt);
+    if (isNaN(date.getTime()) || date <= new Date()) return res.status(400).json({ error: "Дата должна быть в будущем" });
+    if (!(await isChatMember(Number(chatId), uid))) return res.status(403).json({ error: "Нет доступа к этому чату" });
+
+    const rows = await db.execute(sql`
+      INSERT INTO scheduled_messages (chat_id, sender_id, text, scheduled_at)
+      VALUES (${Number(chatId)}, ${uid}, ${String(text).trim()}, ${date.toISOString()})
+      RETURNING *
+    `);
+    res.status(201).json(rows.rows[0]);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/messages/scheduled", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const chatId = req.query.chatId ? Number(req.query.chatId) : undefined;
+    const rows = chatId
+      ? await db.execute(sql`SELECT * FROM scheduled_messages WHERE sender_id = ${uid} AND chat_id = ${chatId} AND scheduled_at > NOW() ORDER BY scheduled_at ASC`)
+      : await db.execute(sql`SELECT * FROM scheduled_messages WHERE sender_id = ${uid} AND scheduled_at > NOW() ORDER BY scheduled_at ASC`);
+    res.json(rows.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/messages/scheduled/:id", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const id = Number(req.params.id);
+    await db.execute(sql`DELETE FROM scheduled_messages WHERE id = ${id} AND sender_id = ${uid}`);
+    res.status(204).send();
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

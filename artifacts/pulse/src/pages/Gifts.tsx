@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useGetGiftCatalog, useGetSentGifts, useGetReceivedGifts, GiftItem, Gift } from "@workspace/api-client-react";
-import { Zap, ArrowUpRight, ArrowDownLeft, Gift as GiftIcon, Search, AlertTriangle, X, UserRound, MessageSquare, EyeOff } from "lucide-react";
+import { useGetGiftCatalog, useGetSentGifts, useGetReceivedGifts, useGetMe, GiftItem, Gift } from "@workspace/api-client-react";
+import { Zap, ArrowUpRight, ArrowDownLeft, Gift as GiftIcon, Search, AlertTriangle, X, UserRound, MessageSquare, EyeOff, Crown, Lock } from "lucide-react";
 import { GiftArt } from "./GiftArt";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -279,10 +279,12 @@ function GiftVisual({ name, emoji, rarity, animationType, size = 64 }: {
   );
 }
 
-function GiftCard({ item, onClick }: { item: GiftItem; onClick: () => void }) {
+function GiftCard({ item, onClick, hasPrime }: { item: GiftItem; onClick: () => void; hasPrime: boolean }) {
   const cfg = RARITY_CONFIG[item.rarity] || RARITY_CONFIG.common;
   const theme = getGiftTheme(item.name);
   const [hovered, setHovered] = useState(false);
+  const isPrimeOnly = !!(item as any).primeOnly;
+  const isLocked = isPrimeOnly && !hasPrime;
 
   return (
     <motion.div
@@ -291,11 +293,11 @@ function GiftCard({ item, onClick }: { item: GiftItem; onClick: () => void }) {
       onClick={onClick}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
-      className={`relative cursor-pointer rounded-2xl overflow-hidden transition-shadow duration-300 ${cfg.glow}`}
+      className={`relative cursor-pointer rounded-2xl overflow-hidden transition-shadow duration-300 ${isLocked ? "opacity-75" : cfg.glow}`}
     >
-      <div className={`p-[1.5px] rounded-2xl bg-gradient-to-br ${cfg.gradient}`}>
+      <div className={`p-[1.5px] rounded-2xl bg-gradient-to-br ${isPrimeOnly ? "from-amber-400 via-yellow-500 to-orange-500" : cfg.gradient}`}>
         <div className="bg-[hsl(222,47%,13%)] rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[160px] relative overflow-hidden">
-          {hovered && item.rarity !== "common" && <FloatingParticles rarity={item.rarity} theme={theme} />}
+          {hovered && item.rarity !== "common" && !isLocked && <FloatingParticles rarity={item.rarity} theme={theme} />}
           <div className="mb-3 relative z-10">
             <GiftVisual
               name={item.name}
@@ -310,9 +312,15 @@ function GiftCard({ item, onClick }: { item: GiftItem; onClick: () => void }) {
             <Zap size={11} className="text-primary" />
             <span>{item.stars} Spark</span>
           </div>
-          <span className={`absolute top-2 left-2 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${cfg.badge}`}>
-            {cfg.label}
+          <span className={`absolute top-2 left-2 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${isPrimeOnly ? "bg-amber-500/30 text-amber-300 border-amber-400/50" : cfg.badge}`}>
+            {isPrimeOnly ? "PRIME" : cfg.label}
           </span>
+          {isLocked && (
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] flex flex-col items-center justify-center gap-1 z-20">
+              <Lock size={22} className="text-amber-400" />
+              <span className="text-[10px] font-bold text-amber-400 flex items-center gap-0.5"><Crown size={9} /> Prime</span>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -397,6 +405,8 @@ const RARITY_ORDER = ["legendary", "epic", "rare", "common"];
 
 export default function Gifts() {
   const queryClient = useQueryClient();
+  const { data: me } = useGetMe();
+  const hasPrime = (me as any)?.hasPrime ?? false;
   const { data: catalog, isLoading: catalogLoading } = useGetGiftCatalog();
   const { data: receivedGifts, isLoading: receivedLoading } = useGetReceivedGifts();
   const { data: sentGifts, isLoading: sentLoading } = useGetSentGifts();
@@ -601,7 +611,18 @@ export default function Gifts() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {filtered?.map((item: GiftItem) => (
-                  <GiftCard key={item.id} item={item} onClick={() => setSelectedGift(item)} />
+                  <GiftCard
+                    key={item.id}
+                    item={item}
+                    hasPrime={hasPrime}
+                    onClick={() => {
+                      if ((item as any).primeOnly && !hasPrime) {
+                        window.location.href = "/prime";
+                        return;
+                      }
+                      setSelectedGift(item);
+                    }}
+                  />
                 ))}
               </div>
             )}

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useSendMessage, getGetMessagesQueryKey, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
+import { useSendMessage, useGetMe, getGetMessagesQueryKey, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Paperclip, Mic, Smile, SendHorizontal, X, Square, Trash2, Images, Reply, Pencil, Clock } from "lucide-react";
+import { Paperclip, Mic, Smile, SendHorizontal, X, Square, Trash2, Images, Reply, Pencil, Clock, Crown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
@@ -61,6 +61,9 @@ export interface ChatInputProps {
 }
 
 export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCancelReply, onCancelEdit }: ChatInputProps) {
+  const { data: me } = useGetMe();
+  const hasPrime = (me as any)?.hasPrime ?? false;
+
   const [text, setText] = useState("");
   const [showEmoji, setShowEmoji] = useState(false);
   const [emojiCategory, setEmojiCategory] = useState(0);
@@ -285,16 +288,28 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
   };
 
 
-  const handleScheduledSend = () => {
+  const handleScheduledSend = async () => {
     if (!text.trim() || !scheduledAt) return;
-    const schedKey = `pulse-scheduled-${chatId}`;
-    const existing = JSON.parse(localStorage.getItem(schedKey) || "[]");
-    existing.push({ id: `${Date.now()}-${Math.random()}`, text: text.trim(), at: new Date(scheduledAt).getTime() });
-    localStorage.setItem(schedKey, JSON.stringify(existing));
-    setText("");
-    setScheduledAt("");
-    setShowScheduler(false);
-    if (textareaRef.current) textareaRef.current.style.height = "40px";
+    try {
+      const headers = { "Content-Type": "application/json", ...getAuthHeaders() };
+      const res = await fetch("/api/messages/schedule", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ chatId, text: text.trim(), scheduledAt: new Date(scheduledAt).toISOString() }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Ошибка");
+        return;
+      }
+      setText("");
+      setScheduledAt("");
+      setShowScheduler(false);
+      if (textareaRef.current) textareaRef.current.style.height = "40px";
+      localStorage.removeItem(draftKey);
+    } catch {
+      alert("Ошибка соединения");
+    }
   };
 
   const _minDate = new Date(Date.now() + 60_000);
@@ -497,11 +512,18 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
             {!editMessage && (
               <button
                 type="button"
-                onClick={() => setShowScheduler(!showScheduler)}
-                title="Запланировать сообщение"
-                className={`p-1.5 transition-colors rounded-full ${showScheduler ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => {
+                  if (!hasPrime) {
+                    window.location.href = "/prime";
+                    return;
+                  }
+                  setShowScheduler(!showScheduler);
+                }}
+                title={hasPrime ? "Запланировать сообщение" : "Только для Pulse Prime — нажмите, чтобы узнать больше"}
+                className={`p-1.5 transition-colors rounded-full relative ${showScheduler ? "text-primary bg-primary/10" : hasPrime ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/40"}`}
               >
                 <Clock size={18} />
+                {!hasPrime && <Crown size={9} className="absolute -top-0.5 -right-0.5 text-amber-400" />}
               </button>
             )}
             <button type="button" onClick={() => setShowEmoji(!showEmoji)}

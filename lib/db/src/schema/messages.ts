@@ -26,9 +26,19 @@ export const reactionsTable = pgTable("reactions", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const scheduledMessagesTable = pgTable("scheduled_messages", {
+  id: serial("id").primaryKey(),
+  chatId: integer("chat_id").notNull(),
+  senderId: integer("sender_id").notNull(),
+  text: text("text").notNull(),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const insertMessageSchema = createInsertSchema(messagesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertReactionSchema = createInsertSchema(reactionsTable).omit({ id: true, createdAt: true });
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messagesTable.$inferSelect;
 export type InsertReaction = z.infer<typeof insertReactionSchema>;
 export type Reaction = typeof reactionsTable.$inferSelect;
+export type ScheduledMessage = typeof scheduledMessagesTable.$inferSelect;

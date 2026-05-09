@@ -88,14 +88,15 @@ export async function runSeed() {
     );
     if ((existing.rows as any[]).length === 0) {
       await db.execute(sql`
-        INSERT INTO gift_items (name, emoji, animation_type, rarity, stars, price, description)
+        INSERT INTO gift_items (name, emoji, animation_type, rarity, stars, price, description, prime_only)
         VALUES (${item.name}, ${item.emoji}, ${item.animationType}, ${item.rarity},
-                ${item.stars}, ${item.price}, ${item.description})
+                ${item.stars}, ${item.price}, ${item.description}, ${(item as any).primeOnly ?? false})
       `);
     } else {
       await db.execute(sql`
         UPDATE gift_items SET emoji=${item.emoji}, animation_type=${item.animationType},
-          rarity=${item.rarity}, stars=${item.stars}, price=${item.price}, description=${item.description}
+          rarity=${item.rarity}, stars=${item.stars}, price=${item.price}, description=${item.description},
+          prime_only=${(item as any).primeOnly ?? false}
         WHERE name = ${item.name}
       `);
     }

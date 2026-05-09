@@ -62,6 +62,15 @@ router.post("/gifts/send", async (req, res) => {
       return res.status(404).json({ error: "Подарок не найден" });
     }
 
+    if ((giftItem as any).primeOnly) {
+      const primeRow = await db.execute(sql`SELECT has_prime, prime_expires_at FROM users WHERE id = ${uid}`);
+      const pu = primeRow.rows[0] as any;
+      const hasPrime = (pu?.has_prime === true || pu?.has_prime === "t") && pu?.prime_expires_at && new Date(pu.prime_expires_at) > new Date();
+      if (!hasPrime) {
+        return res.status(403).json({ error: "Этот подарок доступен только для Pulse Prime участников" });
+      }
+    }
+
     const price = (giftItem as any).price ?? 0;
 
     if (price > 0) {

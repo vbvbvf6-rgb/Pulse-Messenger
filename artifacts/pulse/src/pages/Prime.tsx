@@ -77,16 +77,16 @@ const FEATURES = [
   {
     icon: Gift,
     text: "Эксклюзивные подарки только для Prime-участников",
-    tag: "Скоро",
-    color: "text-blue-400",
-    bg: "bg-blue-500/10",
+    tag: "Работает",
+    color: "text-green-400",
+    bg: "bg-green-500/10",
   },
   {
     icon: Palette,
     text: "Кастомные темы и цвета интерфейса",
-    tag: "Скоро",
-    color: "text-purple-400",
-    bg: "bg-purple-500/10",
+    tag: "Работает",
+    color: "text-green-400",
+    bg: "bg-green-500/10",
   },
   {
     icon: Image,
@@ -98,9 +98,9 @@ const FEATURES = [
   {
     icon: Bell,
     text: "Приоритетные уведомления и поддержка 24/7",
-    tag: "Скоро",
-    color: "text-orange-400",
-    bg: "bg-orange-500/10",
+    tag: "Работает",
+    color: "text-green-400",
+    bg: "bg-green-500/10",
   },
   {
     icon: Infinity,
@@ -112,16 +112,16 @@ const FEATURES = [
   {
     icon: Lock,
     text: "Расширенная приватность: скрытый онлайн-статус",
-    tag: "Скоро",
-    color: "text-slate-400",
-    bg: "bg-slate-500/10",
+    tag: "Работает",
+    color: "text-green-400",
+    bg: "bg-green-500/10",
   },
   {
     icon: Clock,
     text: "Отложенная отправка сообщений по расписанию",
-    tag: "Скоро",
-    color: "text-violet-400",
-    bg: "bg-violet-500/10",
+    tag: "Работает",
+    color: "text-green-400",
+    bg: "bg-green-500/10",
   },
 ];
 

@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bug, MessageSquare, Plus, Send, ChevronLeft, ChevronRight,
-  CheckCircle2, Clock, X, RefreshCw, AlertCircle, Inbox
+  CheckCircle2, Clock, X, RefreshCw, AlertCircle, Inbox, Crown, Zap
 } from "lucide-react";
+import { useGetMe } from "@workspace/api-client-react";
 
 const getCurrentUserId = () => Number(localStorage.getItem("pulse-user-id") || "0");
 function getHeader(): Record<string, string> {
@@ -474,6 +475,8 @@ function SupportTickets() {
 
 export default function Support() {
   const [tab, setTab] = useState<"bugs" | "tickets">("tickets");
+  const { data: me } = useGetMe();
+  const hasPrime = (me as any)?.hasPrime ?? false;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
@@ -481,6 +484,11 @@ export default function Support() {
         <h1 className="text-xl font-bold flex items-center gap-2">
           <MessageSquare size={20} className="text-primary" /> Поддержка
         </h1>
+        {hasPrime && (
+          <span className="ml-3 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+            <Crown size={9} /> PRIME PRIORITY
+          </span>
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto">
@@ -507,7 +515,16 @@ export default function Support() {
           </div>
 
           {/* Info banner */}
-          {tab === "tickets" && (
+          {tab === "tickets" && hasPrime && (
+            <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-start gap-3">
+              <Crown size={18} className="text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-400 flex items-center gap-1.5">Приоритетная поддержка 24/7 <Zap size={12} /></p>
+                <p className="text-xs text-muted-foreground mt-0.5">Как Prime-участник вы получаете ответ в приоритетном порядке. Среднее время ответа: до 30 минут.</p>
+              </div>
+            </div>
+          )}
+          {tab === "tickets" && !hasPrime && (
             <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-start gap-3">
               <Clock size={18} className="text-primary shrink-0 mt-0.5" />
               <div>

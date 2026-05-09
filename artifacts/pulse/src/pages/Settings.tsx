@@ -45,6 +45,26 @@ const STATUS_PRESETS = [
   { emoji: "🎧", ru: "Слушаю музыку",  en: "Listening to music" },
 ];
 
+const PRIME_THEMES = [
+  { id: "cyan",    name: "Cyan (по умолчанию)", primary: "199 89% 48%" },
+  { id: "violet",  name: "Фиолетовый",          primary: "258 90% 60%" },
+  { id: "rose",    name: "Розовый",              primary: "346 84% 58%" },
+  { id: "emerald", name: "Изумрудный",           primary: "152 76% 40%" },
+  { id: "amber",   name: "Золотой",              primary: "43 96% 48%"  },
+  { id: "orange",  name: "Оранжевый",            primary: "24 95% 53%"  },
+];
+
+function applyPrimeTheme(themeId: string) {
+  const theme = PRIME_THEMES.find(t => t.id === themeId);
+  if (theme) {
+    document.documentElement.style.setProperty("--primary", theme.primary);
+    document.documentElement.style.setProperty("--ring", theme.primary);
+  } else {
+    document.documentElement.style.removeProperty("--primary");
+    document.documentElement.style.removeProperty("--ring");
+  }
+}
+
 const LANGUAGE_OPTIONS = [
   { value: "ru", label: "Русский", flag: "🇷🇺" },
   { value: "en", label: "English", flag: "🇬🇧" },
@@ -409,6 +429,12 @@ export default function Settings() {
     const v = localStorage.getItem("pulse-global-auto-delete");
     return v ? Number(v) : null;
   });
+
+  // Prime theme
+  const [primeTheme, setPrimeTheme] = useState(() => localStorage.getItem("pulse-prime-theme") || "cyan");
+  useEffect(() => {
+    if ((user as any)?.hasPrime) applyPrimeTheme(primeTheme);
+  }, [(user as any)?.hasPrime]);
 
   // Avatar file upload
   const avatarFileRef = useRef<HTMLInputElement>(null);
@@ -1131,19 +1157,25 @@ export default function Settings() {
             icon={<User size={18} />}
             color="bg-green-500/10 text-green-500"
             label={t("settings.showOnlineStatus")}
-            desc={t("settings.showOnlineStatusDesc")}
+            desc={(user as any)?.hasPrime ? t("settings.showOnlineStatusDesc") : (lang === "ru" ? "Только для Pulse Prime участников" : "Pulse Prime members only")}
             right={
-              <Switch
-                checked={showOnlineStatusToggle}
-                onCheckedChange={v => {
-                  setShowOnlineStatusToggle(v);
-                  setLs("pulse-privacy-show-online", v);
-                  updateMe.mutate({ data: { showOnlineStatus: v } as any }, {
-                    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }),
-                  });
-                  toast({ title: t("common.saved"), description: v ? t("settings.showOnlineStatusOn") : t("settings.showOnlineStatusOff") });
-                }}
-              />
+              (user as any)?.hasPrime ? (
+                <Switch
+                  checked={showOnlineStatusToggle}
+                  onCheckedChange={v => {
+                    setShowOnlineStatusToggle(v);
+                    setLs("pulse-privacy-show-online", v);
+                    updateMe.mutate({ data: { showOnlineStatus: v } as any }, {
+                      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }),
+                    });
+                    toast({ title: t("common.saved"), description: v ? t("settings.showOnlineStatusOn") : t("settings.showOnlineStatusOff") });
+                  }}
+                />
+              ) : (
+                <a href="/prime" className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors">
+                  <Crown size={9} /> Prime
+                </a>
+              )
             }
           />
           <Row
@@ -1343,6 +1375,28 @@ export default function Settings() {
                   )}
                 </div>
               </div>
+
+              {/* Prime Theme Picker */}
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-muted-foreground mb-2.5">{lang === "ru" ? "Тема интерфейса" : "Interface Theme"}</p>
+                <div className="flex gap-2.5 flex-wrap">
+                  {PRIME_THEMES.map(theme => (
+                    <button
+                      key={theme.id}
+                      title={theme.name}
+                      onClick={() => {
+                        setPrimeTheme(theme.id);
+                        localStorage.setItem("pulse-prime-theme", theme.id);
+                        applyPrimeTheme(theme.id);
+                        toast({ title: lang === "ru" ? "Тема изменена" : "Theme changed", description: theme.name });
+                      }}
+                      className={`w-9 h-9 rounded-full border-2 transition-all hover:scale-110 ${primeTheme === theme.id ? "border-white scale-110 shadow-lg" : "border-transparent"}`}
+                      style={{ background: `hsl(${theme.primary})` }}
+                    />
+                  ))}
+                </div>
+              </div>
+
               <button
                 onClick={handleCancelPrime}
                 disabled={cancelPrimeLoading}
