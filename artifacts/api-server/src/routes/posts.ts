@@ -1,8 +1,67 @@
 import { Router } from "express";
 import { db, postsTable, postLikesTable, postCommentsTable, usersTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 
 const router = Router();
+
+// ── AI Auto-moderation ────────────────────────────────────────────────────────
+
+interface ModerationResult {
+  flagged: boolean;
+  categories: string[];
+  confidence: number;
+  reason: string;
+}
+
+async function moderateContent(text: string): Promise<ModerationResult> {
+  const safe: ModerationResult = { flagged: false, categories: [], confidence: 0, reason: "" };
+  if (!text || text.trim().length < 5) return safe;
+
+  const systemPrompt = `You are a content moderation AI. Analyze the following post text and return ONLY a JSON object (no markdown, no explanation) with:
+- "flagged": boolean (true if content violates rules)
+- "categories": array of violated categories from: ["spam","hate_speech","adult_content","violence","harassment","misinformation","self_harm"]
+- "confidence": integer 0-100 (how confident you are in the flag)
+- "reason": string (short explanation in Russian, max 100 chars, empty if not flagged)
+
+Rules: Flag content with hate speech, explicit sexual content, calls to violence, severe harassment, dangerous self-harm content, or obvious spam. Normal opinions, mild language, and controversial topics are NOT flagged. Be conservative — only flag clear violations.`;
+
+  const tryModerate = async (model: string): Promise<ModerationResult | null> => {
+    try {
+      const r = await fetch("https://text.pollinations.ai/openai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: text.slice(0, 1000) }
+          ],
+          max_tokens: 200,
+          temperature: 0.1,
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!r.ok) return null;
+      const data = await r.json();
+      const raw = data.choices?.[0]?.message?.content || "";
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return null;
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        flagged: !!parsed.flagged,
+        categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+        confidence: Number(parsed.confidence) || 0,
+        reason: String(parsed.reason || ""),
+      };
+    } catch { return null; }
+  };
+
+  let result = await tryModerate("openai");
+  if (!result) result = await tryModerate("mistral");
+  return result || safe;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function buildPost(postId: number, currentUserId: number) {
   const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
@@ -11,14 +70,39 @@ async function buildPost(postId: number, currentUserId: number) {
   const likeRow = await db.query.postLikesTable.findFirst({
     where: and(eq(postLikesTable.postId, postId), eq(postLikesTable.userId, currentUserId))
   });
-  return { ...post, author: author ?? null, isLiked: !!likeRow };
+
+  let appeal: any = null;
+  try {
+    const appealRows = await db.execute(sql`SELECT id, status, appeal_text, admin_response, created_at FROM moderation_appeals WHERE post_id = ${postId}`);
+    appeal = (appealRows.rows[0] as any) || null;
+  } catch {}
+
+  return {
+    ...post,
+    author: author ?? null,
+    isLiked: !!likeRow,
+    appeal,
+  };
 }
+
+// ── Routes ────────────────────────────────────────────────────────────────────
 
 router.get("/posts", async (req, res) => {
   try {
     const uid = req.currentUserId;
-    const posts = await db.select().from(postsTable).orderBy(desc(postsTable.createdAt)).limit(50);
-    const built = await Promise.all(posts.map(p => buildPost(p.id, uid)));
+
+    const isAdminRow = await db.execute(sql`SELECT is_admin FROM users WHERE id = ${uid}`);
+    const isAdmin = !!(isAdminRow.rows[0] as any)?.is_admin;
+
+    const posts = await db.select().from(postsTable).orderBy(desc(postsTable.createdAt)).limit(100);
+
+    const visible = posts.filter((p: any) => {
+      if (isAdmin) return true;
+      if ((p as any).moderationStatus === 'rejected') return p.userId === uid;
+      return true;
+    });
+
+    const built = await Promise.all(visible.map(p => buildPost(p.id, uid)));
     res.json(built.filter(Boolean));
   } catch (err) {
     req.log.error(err);
@@ -31,9 +115,27 @@ router.post("/posts", async (req, res) => {
     const uid = req.currentUserId;
     const { text, imageUrl } = req.body;
     if (!text) return res.status(400).json({ error: "text required" });
+
     const [post] = await db.insert(postsTable).values({ userId: uid, text, imageUrl }).returning();
     const built = await buildPost(post.id, uid);
     res.status(201).json(built);
+
+    // Async AI moderation (don't block response)
+    setImmediate(async () => {
+      try {
+        const result = await moderateContent(text);
+        if (result.flagged && result.confidence >= 65) {
+          await db.execute(sql`
+            UPDATE posts SET
+              moderation_status = 'rejected',
+              moderation_reason = ${result.reason || 'Контент нарушает правила сообщества'},
+              moderation_confidence = ${result.confidence},
+              moderation_categories = ${JSON.stringify(result.categories)}
+            WHERE id = ${post.id}
+          `);
+        }
+      } catch {}
+    });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -42,7 +144,17 @@ router.post("/posts", async (req, res) => {
 
 router.delete("/posts/:postId", async (req, res) => {
   try {
+    const uid = req.currentUserId;
     const postId = Number(req.params.postId);
+
+    const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
+    const isAdminRow = await db.execute(sql`SELECT is_admin FROM users WHERE id = ${uid}`);
+    const isAdmin = !!(isAdminRow.rows[0] as any)?.is_admin;
+
+    if (!post) return res.status(404).json({ error: "Not found" });
+    if (post.userId !== uid && !isAdmin) return res.status(403).json({ error: "Forbidden" });
+
+    await db.execute(sql`DELETE FROM moderation_appeals WHERE post_id = ${postId}`);
     await db.delete(postCommentsTable).where(eq(postCommentsTable.postId, postId));
     await db.delete(postLikesTable).where(eq(postLikesTable.postId, postId));
     await db.delete(postsTable).where(eq(postsTable.id, postId));
@@ -105,6 +217,62 @@ router.post("/posts/:postId/comments", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Appeals ───────────────────────────────────────────────────────────────────
+
+router.post("/posts/:postId/appeal", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const postId = Number(req.params.postId);
+    const { appealText } = req.body;
+
+    if (!appealText || typeof appealText !== "string" || appealText.trim().length < 10) {
+      return res.status(400).json({ error: "Напишите объяснение (минимум 10 символов)" });
+    }
+
+    const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
+    if (!post) return res.status(404).json({ error: "Пост не найден" });
+    if (post.userId !== uid) return res.status(403).json({ error: "Это не ваш пост" });
+    if ((post as any).moderationStatus !== 'rejected') {
+      return res.status(400).json({ error: "Пост не заблокирован" });
+    }
+
+    const existing = await db.execute(sql`SELECT id, status FROM moderation_appeals WHERE post_id = ${postId}`);
+    if ((existing.rows as any[]).length > 0) {
+      const ex = existing.rows[0] as any;
+      if (ex.status === 'pending') return res.status(409).json({ error: "Апелляция уже отправлена и ожидает рассмотрения" });
+      if (ex.status === 'rejected') return res.status(409).json({ error: "Апелляция была отклонена и не может быть подана повторно" });
+    }
+
+    await db.execute(sql`
+      INSERT INTO moderation_appeals (post_id, user_id, appeal_text)
+      VALUES (${postId}, ${uid}, ${appealText.trim()})
+      ON CONFLICT (post_id) DO UPDATE SET
+        appeal_text = ${appealText.trim()},
+        status = 'pending',
+        admin_response = NULL,
+        resolved_at = NULL,
+        created_at = NOW()
+    `);
+
+    res.status(201).json({ success: true, message: "Апелляция отправлена на рассмотрение" });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.get("/posts/:postId/appeal", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const postId = Number(req.params.postId);
+    const rows = await db.execute(sql`SELECT * FROM moderation_appeals WHERE post_id = ${postId} AND user_id = ${uid}`);
+    res.json(rows.rows[0] || null);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 

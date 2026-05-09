@@ -396,6 +396,80 @@ router.post("/admin/topup-requests/:id/deny", requireAdmin, async (req, res) => 
   }
 });
 
+// ── Moderation Appeals ────────────────────────────────────────────────────────
+
+router.get("/admin/moderation/appeals", requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        ma.id, ma.post_id, ma.user_id, ma.appeal_text, ma.status,
+        ma.admin_response, ma.created_at, ma.resolved_at,
+        p.text AS post_text, p.image_url AS post_image_url,
+        p.moderation_reason, p.moderation_confidence, p.moderation_categories,
+        u.username, u.display_name, u.avatar_color, u.avatar_url
+      FROM moderation_appeals ma
+      JOIN posts p ON p.id = ma.post_id
+      JOIN users u ON u.id = ma.user_id
+      ORDER BY
+        CASE ma.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+        ma.created_at DESC
+      LIMIT 100
+    `);
+    res.json(rows.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.post("/admin/moderation/appeals/:id/approve", requireAdmin, async (req, res) => {
+  try {
+    const appealId = Number(req.params.id);
+    const { adminResponse } = req.body;
+
+    const rows = await db.execute(sql`SELECT * FROM moderation_appeals WHERE id = ${appealId}`);
+    const appeal = rows.rows[0] as any;
+    if (!appeal) return res.status(404).json({ error: "Апелляция не найдена" });
+    if (appeal.status !== 'pending') return res.status(400).json({ error: "Апелляция уже обработана" });
+
+    await db.execute(sql`
+      UPDATE moderation_appeals SET status = 'approved', admin_response = ${adminResponse || null}, resolved_at = NOW()
+      WHERE id = ${appealId}
+    `);
+    await db.execute(sql`
+      UPDATE posts SET moderation_status = 'approved', moderation_reason = NULL
+      WHERE id = ${appeal.post_id}
+    `);
+
+    res.json({ success: true, message: "Апелляция одобрена, пост восстановлен" });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.post("/admin/moderation/appeals/:id/reject", requireAdmin, async (req, res) => {
+  try {
+    const appealId = Number(req.params.id);
+    const { adminResponse } = req.body;
+
+    const rows = await db.execute(sql`SELECT * FROM moderation_appeals WHERE id = ${appealId}`);
+    const appeal = rows.rows[0] as any;
+    if (!appeal) return res.status(404).json({ error: "Апелляция не найдена" });
+    if (appeal.status !== 'pending') return res.status(400).json({ error: "Апелляция уже обработана" });
+
+    await db.execute(sql`
+      UPDATE moderation_appeals SET status = 'rejected', admin_response = ${adminResponse || null}, resolved_at = NOW()
+      WHERE id = ${appealId}
+    `);
+
+    res.json({ success: true, message: "Апелляция отклонена" });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 router.get("/admin/check", async (req, res) => {
   try {
     const ok = await isAdminUser(req.currentUserId);

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
 import { useGetPosts, useGetMe, useCreatePost, useLikePost, useCreatePostComment, useGetPostComments, Post } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Heart, MessageCircle, Send, Image, X, Plus, Trash2, MoreVertical, ZoomIn } from "lucide-react";
+import { Heart, MessageCircle, Send, Image, X, Plus, Trash2, MoreVertical, ZoomIn, ShieldAlert, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
@@ -59,7 +59,186 @@ function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
   );
 }
 
-function PostCard({ post }: { post: Post }) {
+function AppealModal({ post, onClose, onSubmitted }: { post: any; onClose: () => void; onSubmitted: () => void }) {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const currentUserId = getCurrentUserId();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (text.trim().length < 10) { setError("Минимум 10 символов"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/posts/${post.id}/appeal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": String(currentUserId) },
+        body: JSON.stringify({ appealText: text.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Ошибка"); setLoading(false); return; }
+      onSubmitted();
+      onClose();
+    } catch { setError("Ошибка соединения"); }
+    setLoading(false);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.92, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.92, opacity: 0 }}
+        className="bg-card border border-border rounded-2xl p-5 max-w-md w-full shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
+            <AlertCircle size={20} className="text-orange-400" />
+          </div>
+          <div>
+            <h3 className="font-bold">Апелляция</h3>
+            <p className="text-xs text-muted-foreground">Объясните, почему пост не нарушает правила</p>
+          </div>
+          <button onClick={onClose} className="ml-auto p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="mb-3 p-3 bg-destructive/5 border border-destructive/20 rounded-xl">
+          <p className="text-xs text-muted-foreground mb-1">Причина блокировки:</p>
+          <p className="text-sm text-destructive/80">{post.moderationReason || "Нарушение правил сообщества"}</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="Объясните, почему данный контент не нарушает правила сообщества..."
+            rows={4}
+            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50 transition-colors resize-none"
+            autoFocus
+          />
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors">
+              Отмена
+            </button>
+            <button
+              type="submit"
+              disabled={loading || text.trim().length < 10}
+              className="flex-1 py-2.5 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-colors disabled:opacity-50"
+            >
+              {loading ? "Отправка..." : "Отправить апелляцию"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function BlockedPostCard({ post, onAppealSubmitted }: { post: any; onAppealSubmitted: () => void }) {
+  const [showAppeal, setShowAppeal] = useState(false);
+  const [, setLocation] = useLocation();
+  const appeal = post.appeal;
+
+  const appealStatus = appeal?.status;
+
+  return (
+    <>
+      <AnimatePresence>
+        {showAppeal && (
+          <AppealModal
+            post={post}
+            onClose={() => setShowAppeal(false)}
+            onSubmitted={onAppealSubmitted}
+          />
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-card border border-destructive/30 rounded-2xl overflow-hidden"
+      >
+        <div className="flex items-center gap-3 p-4 pb-3">
+          <button
+            onClick={() => post.author?.id && setLocation(`/user/${post.author.id}`)}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shrink-0 overflow-hidden hover:opacity-85 transition-opacity opacity-60"
+            style={{ backgroundColor: post.author?.avatarColor || "#333" }}
+          >
+            {post.author?.avatarUrl ? (
+              <img src={post.author.avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              (post.author?.displayName || "U")[0].toUpperCase()
+            )}
+          </button>
+          <div className="flex-1 min-w-0 opacity-60">
+            <p className="font-semibold text-sm truncate">{post.author?.displayName || "Unknown"}</p>
+            <p className="text-xs text-muted-foreground">@{post.author?.username} · {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</p>
+          </div>
+        </div>
+
+        <div className="mx-4 mb-4 p-4 bg-destructive/5 border border-destructive/20 rounded-xl">
+          <div className="flex items-start gap-3">
+            <ShieldAlert size={20} className="text-destructive shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-destructive mb-0.5">Пост заблокирован</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                {post.moderationReason || "Контент нарушает правила сообщества"}
+              </p>
+
+              {!appealStatus && (
+                <button
+                  onClick={() => setShowAppeal(true)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors"
+                >
+                  Подать апелляцию
+                </button>
+              )}
+
+              {appealStatus === 'pending' && (
+                <div className="flex items-center gap-1.5 text-xs text-yellow-500">
+                  <Clock size={13} />
+                  <span className="font-medium">Апелляция на рассмотрении</span>
+                </div>
+              )}
+
+              {appealStatus === 'approved' && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                  <CheckCircle2 size={13} />
+                  <span className="font-medium">Апелляция одобрена — пост восстановлен</span>
+                </div>
+              )}
+
+              {appealStatus === 'rejected' && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-destructive">
+                    <X size={13} />
+                    <span className="font-medium">Апелляция отклонена</span>
+                  </div>
+                  {appeal?.admin_response && (
+                    <p className="text-xs text-muted-foreground">Ответ: {appeal.admin_response}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+function PostCard({ post, onAppealSubmitted }: { post: Post & { appeal?: any; moderationStatus?: string; moderationReason?: string }; onAppealSubmitted?: () => void }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -70,6 +249,15 @@ function PostCard({ post }: { post: Post }) {
   const createComment = useCreatePostComment();
   const { data: me } = useGetMe();
   const currentUserId = getCurrentUserId();
+
+  const isBlocked = (post as any).moderationStatus === 'rejected';
+  const isOwnPost = post.author?.id === currentUserId;
+
+  if (isBlocked && isOwnPost) {
+    return <BlockedPostCard post={post} onAppealSubmitted={onAppealSubmitted || (() => {})} />;
+  }
+
+  if (isBlocked) return null;
 
   const canDelete = post.author?.id === currentUserId || (me as any)?.isAdmin === true;
 
@@ -90,7 +278,6 @@ function PostCard({ post }: { post: Post }) {
   });
 
   const handleLike = () => {
-    // Optimistic update
     queryClient.setQueryData(["/api/posts"], (old: any) => {
       if (!Array.isArray(old)) return old;
       return old.map((p: any) => {
@@ -101,7 +288,6 @@ function PostCard({ post }: { post: Post }) {
     });
     likePost.mutate({ postId: post.id }, {
       onError: () => {
-        // Rollback on error
         queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
       }
     });
@@ -279,7 +465,7 @@ export default function Feed() {
   const [newPostText, setNewPostText] = useState("");
   const [newPostImage, setNewPostImage] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
-  const { data: posts, isLoading } = useGetPosts();
+  const { data: posts, isLoading, refetch } = useGetPosts();
   const { data: me } = useGetMe();
   const createPost = useCreatePost();
   const queryClient = useQueryClient();
@@ -334,7 +520,6 @@ export default function Feed() {
     setNewPostImage(null);
     setShowCreatePost(false);
 
-    // Optimistic: show post immediately in the feed
     const optimisticId = -Date.now();
     const optimisticPost = {
       id: optimisticId,
@@ -345,6 +530,7 @@ export default function Feed() {
       isLiked: false,
       createdAt: new Date().toISOString(),
       userId: currentUserId,
+      moderationStatus: 'approved',
       author: me ? {
         id: me.id,
         displayName: me.displayName,
@@ -365,7 +551,6 @@ export default function Feed() {
         { data: { text: text || " ", imageUrl: image || undefined } },
       );
     } catch {
-      // Remove optimistic post on failure
       queryClient.setQueryData(["/api/posts"], (old: any) =>
         Array.isArray(old) ? old.filter((p: any) => p.id !== optimisticId) : old
       );
@@ -483,7 +668,13 @@ export default function Feed() {
               <p className="text-sm">Будь первым кто поделится чем-нибудь!</p>
             </div>
           ) : (
-            posts?.map((post: any) => <PostCard key={post.id} post={post} />)
+            posts?.map((post: any) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                onAppealSubmitted={() => refetch()}
+              />
+            ))
           )}
         </div>
       </div>

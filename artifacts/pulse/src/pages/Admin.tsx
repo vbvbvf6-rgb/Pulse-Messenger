@@ -4,7 +4,8 @@ import {
   Shield, Zap, Users, TrendingUp, Send, CheckCircle, AlertTriangle, RefreshCw,
   Plus, Trash2, Key, BadgeCheck, X, ShieldCheck, ShieldOff, MessageSquare,
   PhoneCall, Gift, Crown, Megaphone, BarChart3, Activity, Star,
-  Edit3, Save, ChevronDown, ChevronRight, Minus, Ban, FileText, Trophy, Image, Package
+  Edit3, Save, ChevronDown, ChevronRight, Minus, Ban, FileText, Trophy, Image, Package,
+  ShieldAlert, Clock, CheckCircle2
 } from "lucide-react";
 
 interface AdminUser {
@@ -152,6 +153,73 @@ export default function Admin() {
   // Ban
   const [banLoading, setBanLoading] = useState(false);
   const [bannedIds, setBannedIds] = useState<Set<number>>(new Set());
+
+  // Moderation Appeals
+  interface ModerationAppeal {
+    id: number;
+    post_id: number;
+    user_id: number;
+    appeal_text: string;
+    status: 'pending' | 'approved' | 'rejected';
+    admin_response: string | null;
+    created_at: string;
+    resolved_at: string | null;
+    post_text: string;
+    post_image_url: string | null;
+    moderation_reason: string | null;
+    moderation_confidence: number | null;
+    moderation_categories: string | null;
+    username: string;
+    display_name: string;
+    avatar_color: string;
+    avatar_url: string | null;
+  }
+  const [appeals, setAppeals] = useState<ModerationAppeal[]>([]);
+  const [appealsLoading, setAppealsLoading] = useState(false);
+  const [showAppeals, setShowAppeals] = useState(false);
+  const [appealActionLoading, setAppealActionLoading] = useState<number | null>(null);
+  const [appealResponse, setAppealResponse] = useState<Record<number, string>>({});
+
+  const fetchAppeals = async () => {
+    setAppealsLoading(true);
+    try {
+      const res = await fetch("/api/admin/moderation/appeals", { headers: getHeader() });
+      if (res.ok) setAppeals(await res.json());
+    } catch {}
+    setAppealsLoading(false);
+  };
+
+  const handleAppealApprove = async (appealId: number) => {
+    setAppealActionLoading(appealId);
+    try {
+      const res = await fetch(`/api/admin/moderation/appeals/${appealId}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ adminResponse: appealResponse[appealId] || "" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast("✅ Апелляция одобрена, пост восстановлен", "ok");
+      setAppeals(prev => prev.map(a => a.id === appealId ? { ...a, status: 'approved' as const } : a));
+    } catch { showToast("Ошибка соединения", "err"); }
+    setAppealActionLoading(null);
+  };
+
+  const handleAppealReject = async (appealId: number) => {
+    setAppealActionLoading(appealId);
+    try {
+      const res = await fetch(`/api/admin/moderation/appeals/${appealId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ adminResponse: appealResponse[appealId] || "" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast("❌ Апелляция отклонена", "ok");
+      setAppeals(prev => prev.map(a => a.id === appealId ? { ...a, status: 'rejected' as const } : a));
+    } catch { showToast("Ошибка соединения", "err"); }
+    setAppealActionLoading(null);
+  };
 
   // Top-up requests
   interface TopupRequest {
@@ -756,6 +824,125 @@ export default function Admin() {
                           {r.status === "approved" ? "Одобрено" : "Отклонено"}
                         </span>
                       )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Moderation Appeals */}
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <button
+            onClick={() => { setShowAppeals(v => !v); if (!showAppeals && appeals.length === 0) fetchAppeals(); }}
+            className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                <ShieldAlert size={18} className="text-orange-400" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">Апелляции к блокировкам</p>
+                <p className="text-xs text-muted-foreground">
+                  {appeals.filter(a => a.status === "pending").length > 0
+                    ? `${appeals.filter(a => a.status === "pending").length} ожидают рассмотрения`
+                    : "Рассмотреть запросы пользователей"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {appeals.filter(a => a.status === "pending").length > 0 && (
+                <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-black flex items-center justify-center">
+                  {appeals.filter(a => a.status === "pending").length}
+                </span>
+              )}
+              {showAppeals ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+            </div>
+          </button>
+
+          {showAppeals && (
+            <div className="border-t border-border">
+              <div className="p-2 border-b border-border flex justify-end">
+                <button onClick={fetchAppeals} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary transition-colors">
+                  <RefreshCw size={12} className={appealsLoading ? "animate-spin" : ""} /> Обновить
+                </button>
+              </div>
+              {appealsLoading ? (
+                <div className="p-6 flex justify-center"><RefreshCw size={20} className="animate-spin text-muted-foreground" /></div>
+              ) : appeals.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Апелляций нет</div>
+              ) : (
+                <div className="divide-y divide-border max-h-[520px] overflow-y-auto">
+                  {appeals.map(appeal => (
+                    <div key={appeal.id} className="p-4 space-y-3">
+                      {/* User info */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white text-xs font-bold overflow-hidden" style={{ backgroundColor: appeal.avatar_color }}>
+                          {appeal.avatar_url ? <img src={appeal.avatar_url} className="w-full h-full rounded-full object-cover" alt="" /> : appeal.display_name[0]?.toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">@{appeal.username}</p>
+                          <p className="text-[10px] text-muted-foreground">{new Date(appeal.created_at).toLocaleString("ru-RU")}</p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          appeal.status === 'pending' ? "bg-orange-500/10 text-orange-400 border border-orange-500/30" :
+                          appeal.status === 'approved' ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" :
+                          "bg-destructive/10 text-destructive border border-destructive/30"
+                        }`}>
+                          {appeal.status === 'pending' ? '⏳ На рассмотрении' : appeal.status === 'approved' ? '✓ Одобрено' : '✗ Отклонено'}
+                        </span>
+                      </div>
+
+                      {/* Blocked post text */}
+                      <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-3">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Заблокированный пост</p>
+                        <p className="text-xs text-foreground line-clamp-3">{appeal.post_text}</p>
+                        {appeal.moderation_reason && (
+                          <p className="text-[10px] text-destructive/70 mt-1.5">
+                            Причина ИИ: {appeal.moderation_reason}
+                            {appeal.moderation_confidence != null && ` (${appeal.moderation_confidence}%)`}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Appeal text */}
+                      <div className="bg-secondary/50 rounded-xl p-3">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Обращение пользователя</p>
+                        <p className="text-xs text-foreground">{appeal.appeal_text}</p>
+                      </div>
+
+                      {/* Action */}
+                      {appeal.status === 'pending' ? (
+                        <div className="space-y-2">
+                          <input
+                            value={appealResponse[appeal.id] || ""}
+                            onChange={e => setAppealResponse(prev => ({ ...prev, [appeal.id]: e.target.value }))}
+                            placeholder="Ответ администратора (необязательно)..."
+                            className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary transition-colors"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleAppealApprove(appeal.id)}
+                              disabled={appealActionLoading === appeal.id}
+                              className="flex-1 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold hover:bg-emerald-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            >
+                              <CheckCircle2 size={13} />
+                              {appealActionLoading === appeal.id ? "..." : "Одобрить · восстановить пост"}
+                            </button>
+                            <button
+                              onClick={() => handleAppealReject(appeal.id)}
+                              disabled={appealActionLoading === appeal.id}
+                              className="flex-1 py-2 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-bold hover:bg-destructive/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            >
+                              <X size={13} />
+                              {appealActionLoading === appeal.id ? "..." : "Отклонить"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : appeal.admin_response ? (
+                        <div className="text-xs text-muted-foreground italic px-1">Ответ: {appeal.admin_response}</div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
