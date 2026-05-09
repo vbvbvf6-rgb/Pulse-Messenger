@@ -318,7 +318,11 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
       {/* Header */}
       <header className="h-16 border-b border-border flex items-center px-4 justify-between bg-card z-10 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <button className="p-2 -ml-2 text-muted-foreground hover:text-foreground shrink-0" onClick={() => setSelectedChatId(null)}>
+          <button
+            className="flex items-center justify-center w-9 h-9 -ml-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-colors shrink-0 md:bg-transparent md:text-muted-foreground md:hover:text-foreground md:w-auto md:h-auto md:p-2 md:-ml-2 md:rounded-none"
+            onClick={() => setSelectedChatId(null)}
+            aria-label="Назад к чатам"
+          >
             <ArrowLeft size={20} />
           </button>
 

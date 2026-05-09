@@ -47,7 +47,7 @@ export default function Home() {
       </div>
       {/* Mobile view logic can be added here to slide over */}
       {selectedChatId && (
-        <div className="absolute inset-0 z-10 md:hidden bg-background">
+        <div className="absolute inset-x-0 top-0 bottom-14 z-10 md:hidden md:bottom-0 bg-background">
           <ChatWindow chatId={selectedChatId} />
         </div>
       )}
