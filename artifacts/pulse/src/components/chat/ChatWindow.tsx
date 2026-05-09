@@ -87,7 +87,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, botTyping, typingUsers.length]);
 
   const isBot = chat && chat.type === "direct" && (chat.otherUser as any)?.isBot;
   const autoDeleteTimer = (chat as any)?.autoDeleteTimer as number | null | undefined;
@@ -498,45 +498,50 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
             />
           ))
         )}
-      </div>
 
-      {/* Typing indicators */}
-      {(botTyping || typingUsers.length > 0) && (
-        <div className="px-4 pb-3 flex flex-col gap-1.5">
-          {botTyping && (
-            <div className="flex items-end gap-2">
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 overflow-hidden"
-                style={{ backgroundColor: (chat?.otherUser as any)?.avatarColor || "#00BCD4" }}
-              >
-                {(chat?.otherUser as any)?.avatarUrl ? (
-                  <img src={(chat?.otherUser as any).avatarUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  (chat?.otherUser as any)?.displayName?.[0]?.toUpperCase() || "AI"
-                )}
+        {/* Typing indicators — inside the scroll area, right after messages */}
+        {(botTyping || typingUsers.length > 0) && (
+          <div className="flex flex-col gap-2 pt-1">
+            {botTyping && (
+              <div className="flex items-end gap-2">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 overflow-hidden"
+                  style={{ backgroundColor: (chat?.otherUser as any)?.avatarColor || "#00BCD4" }}
+                >
+                  {(chat?.otherUser as any)?.avatarUrl ? (
+                    <img src={(chat?.otherUser as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (chat?.otherUser as any)?.displayName?.[0]?.toUpperCase() || "AI"
+                  )}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-primary/70 rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-primary/70 rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0.2s" }} />
+                    <span className="w-2 h-2 bg-primary/70 rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0.4s" }} />
+                  </div>
+                  <span className="text-[11px] text-muted-foreground/70 pl-1">Печатает...</span>
+                </div>
               </div>
-              <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
-                <span className="w-2 h-2 bg-muted-foreground rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0ms" }} />
-                <span className="w-2 h-2 bg-muted-foreground rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0.2s" }} />
-                <span className="w-2 h-2 bg-muted-foreground rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0.4s" }} />
+            )}
+            {typingUsers.map(u => (
+              <div key={u.userId} className="flex items-end gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                  {u.displayName[0]?.toUpperCase() || "?"}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-primary/70 rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-primary/70 rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0.2s" }} />
+                    <span className="w-2 h-2 bg-primary/70 rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0.4s" }} />
+                  </div>
+                  <span className="text-[11px] text-muted-foreground/70 pl-1">{u.displayName} печатает...</span>
+                </div>
               </div>
-            </div>
-          )}
-          {typingUsers.map(u => (
-            <div key={u.userId} className="flex items-end gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                {u.displayName[0]?.toUpperCase() || "?"}
-              </div>
-              <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground mr-1.5">{u.displayName}</span>
-                <span className="w-2 h-2 bg-muted-foreground rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0ms" }} />
-                <span className="w-2 h-2 bg-muted-foreground rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0.2s" }} />
-                <span className="w-2 h-2 bg-muted-foreground rounded-full" style={{ animation: "typingBounce 1.2s ease-in-out infinite", animationDelay: "0.4s" }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Input */}
       <div className="p-4 bg-card border-t border-border z-10 shrink-0">
