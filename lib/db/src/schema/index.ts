@@ -7,3 +7,4 @@ export * from "./gifts";
 export * from "./stories";
 export * from "./posts";
 export * from "./daily_bonus";
+export * from "./support";
