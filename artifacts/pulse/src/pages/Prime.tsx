@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Crown, Zap, Check, Star, Shield, MessageCircle, Gift, Image,
   Infinity, X, AlertTriangle, Palette, RefreshCw, TrendingUp,
-  ShoppingCart, Bell, Clock, Lock
+  ShoppingCart, Bell, Clock, Lock, CalendarClock, RotateCcw, Flame
 } from "lucide-react";
 import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -125,11 +125,219 @@ const FEATURES = [
   },
 ];
 
+function useTick(expiresAt: string) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, new Date(expiresAt).getTime() - Date.now()));
+  useEffect(() => {
+    const id = setInterval(() => setRemaining(Math.max(0, new Date(expiresAt).getTime() - Date.now())), 1000);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+  const totalMs = remaining;
+  const days = Math.floor(totalMs / 86400000);
+  const hours = Math.floor((totalMs % 86400000) / 3600000);
+  const minutes = Math.floor((totalMs % 3600000) / 60000);
+  const seconds = Math.floor((totalMs % 60000) / 1000);
+  return { days, hours, minutes, seconds, totalMs };
+}
+
+function PrimeCountdown({ expiresAt, onRenew, planMonths }: { expiresAt: string; onRenew: () => void; planMonths?: number }) {
+  const { days, hours, minutes, seconds, totalMs } = useTick(expiresAt);
+  const expired = totalMs <= 0;
+  const isCritical = !expired && days < 1;
+  const isWarning = !expired && days < 7;
+
+  const totalDuration = (planMonths ?? 1) * 30 * 86400000;
+  const elapsed = totalDuration - totalMs;
+  const progress = Math.min(1, Math.max(0, elapsed / totalDuration));
+
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  const dashOffset = C * (1 - progress);
+
+  const arcColor = expired ? "#ef4444" : isCritical ? "#ef4444" : isWarning ? "#f97316" : "#eab308";
+  const glowColor = expired ? "rgba(239,68,68,0.3)" : isCritical ? "rgba(239,68,68,0.25)" : isWarning ? "rgba(249,115,22,0.25)" : "rgba(234,179,8,0.2)";
+
+  const expiryDate = new Date(expiresAt);
+  const expiryStr = expiryDate.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+  const expiryTime = expiryDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`relative rounded-3xl border p-5 overflow-hidden ${
+        expired
+          ? "bg-destructive/5 border-destructive/30"
+          : isCritical
+          ? "bg-red-500/5 border-red-500/30"
+          : isWarning
+          ? "bg-orange-500/5 border-orange-500/30"
+          : "bg-card border-border"
+      }`}
+      style={{ boxShadow: `0 0 40px ${glowColor}` }}
+    >
+      <div className="absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: glowColor }} />
+
+      <div className="flex items-center gap-2 mb-4 relative z-10">
+        <CalendarClock size={16} className={expired ? "text-destructive" : isWarning ? "text-orange-400" : "text-yellow-400"} />
+        <span className="text-sm font-bold text-foreground">Ваша подписка Prime</span>
+        {isWarning && !expired && (
+          <motion.span
+            animate={{ opacity: [1, 0.5, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className={`ml-auto text-[10px] font-black px-2 py-0.5 rounded-full border ${
+              isCritical
+                ? "bg-red-500/20 text-red-400 border-red-500/30"
+                : "bg-orange-500/20 text-orange-400 border-orange-500/30"
+            }`}
+          >
+            {isCritical ? "⚠ Истекает сегодня!" : "⚠ Скоро истекает"}
+          </motion.span>
+        )}
+        {expired && (
+          <span className="ml-auto text-[10px] font-black px-2 py-0.5 rounded-full border bg-destructive/20 text-destructive border-destructive/30">
+            Истекла
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-5 relative z-10">
+        <div className="relative shrink-0" style={{ width: 120, height: 120 }}>
+          <svg width="120" height="120" className="-rotate-90">
+            <circle cx="60" cy="60" r={R} fill="none" stroke="currentColor" strokeWidth="6" className="text-border" />
+            <circle
+              cx="60" cy="60" r={R}
+              fill="none"
+              stroke={arcColor}
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={dashOffset}
+              style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s ease" }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            {expired ? (
+              <span className="text-destructive font-black text-sm">Истекла</span>
+            ) : isCritical ? (
+              <>
+                <span className="text-xl font-black leading-none" style={{ color: arcColor }}>{hours}ч</span>
+                <span className="text-xs font-bold" style={{ color: arcColor }}>{minutes}м {seconds}с</span>
+              </>
+            ) : (
+              <>
+                <span className="text-3xl font-black leading-none" style={{ color: arcColor }}>{days}</span>
+                <span className="text-xs text-muted-foreground font-medium">{days === 1 ? "день" : days < 5 ? "дня" : "дней"}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex-1 min-w-0 space-y-3">
+          {!expired && !isCritical && (
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { label: "часов", value: hours },
+                { label: "минут", value: minutes },
+                { label: "секунд", value: seconds },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-secondary/50 rounded-xl p-2 text-center">
+                  <div className="text-base font-black text-foreground tabular-nums">{String(value).padStart(2, "0")}</div>
+                  <div className="text-[10px] text-muted-foreground">{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!expired && isCritical && (
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { label: "минут", value: minutes },
+                { label: "секунд", value: seconds },
+              ].map(({ label, value }) => (
+                <div key={label} className="bg-red-500/10 rounded-xl p-2 text-center border border-red-500/20">
+                  <div className="text-lg font-black text-red-400 tabular-nums">{String(value).padStart(2, "0")}</div>
+                  <div className="text-[10px] text-muted-foreground">{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock size={11} />
+              <span>
+                {expired ? "Истекла" : "Истекает"} {expiryStr} в {expiryTime}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <RotateCcw size={11} />
+              <span>Автопродление через Spark ⚡</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {(isWarning || expired) && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`mt-4 rounded-2xl p-3.5 border text-sm relative z-10 ${
+            expired
+              ? "bg-destructive/10 border-destructive/20"
+              : isCritical
+              ? "bg-red-500/10 border-red-500/20"
+              : "bg-orange-500/10 border-orange-500/20"
+          }`}
+        >
+          <div className="flex items-start gap-2 mb-3">
+            <Flame size={14} className={expired || isCritical ? "text-red-400 shrink-0 mt-0.5" : "text-orange-400 shrink-0 mt-0.5"} />
+            <p className={`text-xs leading-relaxed ${expired || isCritical ? "text-red-300" : "text-orange-300"}`}>
+              {expired
+                ? "Ваша подписка Prime истекла. Продлите её, чтобы восстановить все привилегии."
+                : isCritical
+                ? `Осталось менее суток! Продлите сейчас, чтобы не потерять привилегии.`
+                : `Осталось ${days} ${days < 5 ? "дня" : "дней"}. Продлите заранее — продление добавится к текущему сроку.`}
+            </p>
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={onRenew}
+            className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 ${
+              expired || isCritical
+                ? "bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                : "bg-gradient-to-r from-orange-500 to-yellow-500 text-black shadow-[0_0_20px_rgba(249,115,22,0.25)]"
+            }`}
+          >
+            <Crown size={14} />
+            {expired ? "Восстановить Prime" : "Продлить подписку"}
+          </motion.button>
+        </motion.div>
+      )}
+
+      {!isWarning && !expired && (
+        <button
+          onClick={onRenew}
+          className="mt-4 w-full py-2.5 rounded-xl border border-yellow-500/30 text-yellow-400 text-xs font-semibold hover:bg-yellow-500/10 transition-colors flex items-center justify-center gap-1.5 relative z-10"
+        >
+          <RotateCcw size={12} /> Продлить заранее
+        </button>
+      )}
+    </motion.div>
+  );
+}
+
 const TAG_COLORS: Record<string, string> = {
   "Работает": "bg-green-500/20 text-green-400 border-green-500/30",
   "Визуально": "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   "Скоро": "bg-blue-500/20 text-blue-400 border-blue-500/30",
 };
+
+function getPlanMonths(expiresAt: string): number {
+  const msLeft = new Date(expiresAt).getTime() - Date.now();
+  if (msLeft > 300 * 86400000) return 12;
+  if (msLeft > 150 * 86400000) return 6;
+  return 1;
+}
 
 export default function Prime() {
   const { data: me } = useGetMe();
@@ -144,7 +352,10 @@ export default function Prime() {
   const plan = PLANS.find(p => p.id === selected)!;
   const wallet = (me as any)?.balance ?? 0;
   const hasPrime = (me as any)?.hasPrime ?? false;
+  const primeExpiresAt: string | null = (me as any)?.primeExpiresAt ?? null;
   const canAfford = wallet >= plan.spark;
+
+  const openRenewModal = () => setShowModal(true);
 
   const handleSubscribe = async () => {
     setLoading(true);
@@ -217,6 +428,15 @@ export default function Prime() {
             <span className="text-xs font-semibold text-yellow-400">Оплата Spark ⚡</span>
           </div>
         </motion.div>
+
+        {/* Prime Countdown — shown only when subscribed */}
+        {(hasPrime || success) && primeExpiresAt && (
+          <PrimeCountdown
+            expiresAt={primeExpiresAt}
+            onRenew={openRenewModal}
+            planMonths={getPlanMonths(primeExpiresAt)}
+          />
+        )}
 
         {/* Features */}
         <motion.div
@@ -308,18 +528,28 @@ export default function Prime() {
           </span>
         </div>
 
-        {/* Subscribe button */}
+        {/* Subscribe / renew button */}
         <AnimatePresence mode="wait">
           {success || hasPrime ? (
             <motion.div
               key="success"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-green-500/10 border border-green-500/30 rounded-2xl p-6 text-center"
+              className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-4 flex items-center gap-3"
             >
-              <Crown size={40} className="mx-auto mb-3 text-yellow-400" />
-              <h3 className="text-lg font-bold text-foreground mb-1">Prime активирован! ⭐</h3>
-              <p className="text-sm text-muted-foreground">Все привилегии уже работают</p>
+              <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center shrink-0">
+                <Crown size={20} className="text-yellow-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-foreground">Prime активирован ⭐</p>
+                <p className="text-xs text-muted-foreground">Все привилегии уже работают</p>
+              </div>
+              <button
+                onClick={openRenewModal}
+                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 transition-colors shrink-0"
+              >
+                Продлить
+              </button>
             </motion.div>
           ) : (
             <motion.button
