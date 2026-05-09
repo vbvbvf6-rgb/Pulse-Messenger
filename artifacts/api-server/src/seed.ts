@@ -50,6 +50,12 @@ const GIFT_CATALOG = [
   { name: "Чёрная дыра",       emoji: "🌀", animationType: "vortex",    rarity: "cosmic", stars: 90,  price: 375000,  description: "Точка, из которой нет возврата" },
   { name: "Мультивселенная",   emoji: "🪩", animationType: "vortex",    rarity: "cosmic", stars: 99,  price: 450000,  description: "Бесконечное множество параллельных миров" },
   { name: "Абсолют",           emoji: "⚜️", animationType: "supernova", rarity: "cosmic", stars: 100, price: 500000,  description: "Абсолютное совершенство — предел возможного" },
+
+  // ── PRIME EXCLUSIVE ────────────────────────────────────────────────────
+  { name: "Корона Prime",       emoji: "👑", animationType: "magic",     rarity: "epic",      stars: 10, price: 5000,  description: "Эксклюзивная корона для избранных Prime-участников", primeOnly: true },
+  { name: "Пульс Сердца",       emoji: "💜", animationType: "hearts",    rarity: "legendary", stars: 18, price: 30000, description: "Бьющийся пульс — символ вечной связи Prime", primeOnly: true },
+  { name: "Звезда Prime",       emoji: "⭐", animationType: "stars",     rarity: "legendary", stars: 22, price: 55000, description: "Эксклюзивная звезда — только для Prime-участников", primeOnly: true },
+  { name: "Вселенский Огонь",   emoji: "🔥", animationType: "flame",     rarity: "cosmic",    stars: 80, price: 300000, description: "Огонь, что горит вечно — особый дар Prime", primeOnly: true },
 ];
 
 const SYSTEM_USERS = [

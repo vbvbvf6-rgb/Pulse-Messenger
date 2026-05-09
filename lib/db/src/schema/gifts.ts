@@ -12,6 +12,7 @@ export const giftItemsTable = pgTable("gift_items", {
   stars: integer("stars").notNull().default(1),
   price: integer("price").notNull().default(10),
   description: text("description").notNull().default(""),
+  primeOnly: boolean("prime_only").notNull().default(false),
 });
 
 export const giftsTable = pgTable("gifts", {
