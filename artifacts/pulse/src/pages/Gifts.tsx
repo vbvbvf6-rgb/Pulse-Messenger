@@ -10,6 +10,19 @@ import { Input } from "@/components/ui/input";
 import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 
+const GIFT_IMAGES: Record<string, string> = {
+  "Красная роза":  "/gifts/rose-in-glass.png",
+  "Торт":          "/gifts/birthday-cake.png",
+  "Кристалл":      "/gifts/magic-crystal.png",
+  "Бриллиант":     "/gifts/diamond-heart.png",
+  "Звезда":        "/gifts/star-42.png",
+  "Котёнок":       "/gifts/teddy-bear.png",
+  "Воздушный шар": "/gifts/confetti-box.png",
+  "Самоцвет":      "/gifts/gold-coin.png",
+  "Ракета":        "/gifts/gaming-console.png",
+  "Луна":          "/gifts/retro-phone.png",
+};
+
 const RARITY_CONFIG: Record<string, { gradient: string; glow: string; badge: string; label: string }> = {
   cosmic: {
     gradient: "from-cyan-300 via-violet-500 to-fuchsia-500",
@@ -265,7 +278,20 @@ function GiftVisual({ name, emoji, rarity, animationType, size = 64 }: {
         style={{ width: size, height: size }}
         {...(artAnim as any)}
       >
-        <GiftArt name={name} size={size} />
+        {GIFT_IMAGES[name] ? (
+          <img
+            src={GIFT_IMAGES[name]}
+            alt={name}
+            width={size}
+            height={size}
+            style={{
+              objectFit: "contain",
+              filter: `drop-shadow(0 4px ${Math.round(size * 0.25)}px rgba(0,0,0,0.5))`,
+            }}
+          />
+        ) : (
+          <GiftArt name={name} size={size} />
+        )}
       </motion.div>
       {(rarity === "legendary" || isCosmic) && (
         <motion.div
