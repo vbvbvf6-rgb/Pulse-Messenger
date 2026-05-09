@@ -11,6 +11,12 @@ import { formatDistanceToNow } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 
 const RARITY_CONFIG: Record<string, { gradient: string; glow: string; badge: string; label: string }> = {
+  cosmic: {
+    gradient: "from-cyan-300 via-violet-500 to-fuchsia-500",
+    glow: "shadow-[0_0_40px_rgba(167,139,250,0.7)] hover:shadow-[0_0_70px_rgba(167,139,250,0.9)]",
+    badge: "bg-violet-500/30 text-violet-200 border-violet-300/60",
+    label: "COSMIC",
+  },
   legendary: {
     gradient: "from-yellow-300 via-orange-400 to-red-500",
     glow: "shadow-[0_0_30px_rgba(251,191,36,0.5)] hover:shadow-[0_0_50px_rgba(251,191,36,0.7)]",
@@ -79,6 +85,12 @@ const GIFT_THEMES: Record<string, GiftTheme> = {
   "Пульс":          { bg1: "#e879f9", bg2: "#2e1065", glow: "#d946ef", ring: "#a21caf" },
   "Звезда":         { bg1: "#fde68a", bg2: "#7c2d12", glow: "#f59e0b", ring: "#b45309" },
   "Бесконечность":  { bg1: "#67e8f9", bg2: "#0c4a6e", glow: "#22d3ee", ring: "#0891b2" },
+
+  "Нейтронная звезда": { bg1: "#ffffff", bg2: "#0a0a2e", glow: "#e0e7ff", ring: "#c7d2fe" },
+  "Квазар":            { bg1: "#fef9c3", bg2: "#0c0a3e", glow: "#fde047", ring: "#facc15" },
+  "Чёрная дыра":       { bg1: "#4c1d95", bg2: "#020617", glow: "#7c3aed", ring: "#6d28d9" },
+  "Мультивселенная":   { bg1: "#e879f9", bg2: "#0f0521", glow: "#d946ef", ring: "#a21caf" },
+  "Абсолют":           { bg1: "#ffffff", bg2: "#030712", glow: "#f0f9ff", ring: "#bae6fd" },
 };
 
 const DEFAULT_THEME: GiftTheme = { bg1: "#94a3b8", bg2: "#1e293b", glow: "#64748b", ring: "#475569" };
@@ -144,6 +156,16 @@ function getEmojiAnimation(animationType: string) {
         animate: { rotate: [0, 360], scale: [1, 1.08, 0.97, 1.04, 1] },
         transition: { duration: 4, repeat: Infinity, ease: "linear" },
       };
+    case "supernova":
+      return {
+        animate: { scale: [1, 1.5, 0.8, 1.35, 0.95, 1], filter: ["brightness(1)", "brightness(2.5)", "brightness(0.9)", "brightness(2)", "brightness(1)"] },
+        transition: { duration: 1.8, repeat: Infinity, repeatDelay: 0.6 },
+      };
+    case "vortex":
+      return {
+        animate: { rotate: [0, 360], scale: [1, 1.12, 0.94, 1.06, 1] },
+        transition: { duration: 1.4, repeat: Infinity, ease: "linear" },
+      };
     case "bounce":
       return {
         animate: { y: [0, -16, 2, -10, 0], scale: [1, 0.92, 1.08, 0.96, 1] },
@@ -158,7 +180,7 @@ function getEmojiAnimation(animationType: string) {
 }
 
 function FloatingParticles({ rarity, theme }: { rarity: string; theme: GiftTheme }) {
-  const count = rarity === "legendary" ? 8 : rarity === "epic" ? 6 : rarity === "rare" ? 4 : 2;
+  const count = rarity === "cosmic" ? 12 : rarity === "legendary" ? 8 : rarity === "epic" ? 6 : rarity === "rare" ? 4 : 2;
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
@@ -188,6 +210,7 @@ function GiftVisual({ name, emoji, rarity, animationType, size = 64 }: {
 }) {
   const theme = getGiftTheme(name);
   const artAnim = getEmojiAnimation(animationType);
+  const isCosmic = rarity === "cosmic";
   const isHighRarity = rarity === "legendary" || rarity === "epic";
   const isRare = rarity === "rare";
 
@@ -197,11 +220,31 @@ function GiftVisual({ name, emoji, rarity, animationType, size = 64 }: {
       style={{
         width: size,
         height: size,
-        background: `radial-gradient(circle at 35% 30%, ${theme.bg1}22 0%, ${theme.bg2}cc 100%)`,
-        boxShadow: `0 0 ${size * 0.4}px ${theme.glow}60, inset 0 1px 0 rgba(255,255,255,0.15)`,
+        background: isCosmic
+          ? `radial-gradient(circle at 35% 30%, ${theme.bg1}30 0%, ${theme.bg2}ff 100%)`
+          : `radial-gradient(circle at 35% 30%, ${theme.bg1}22 0%, ${theme.bg2}cc 100%)`,
+        boxShadow: isCosmic
+          ? `0 0 ${size * 0.7}px ${theme.glow}90, 0 0 ${size * 1.2}px ${theme.ring}40, inset 0 1px 0 rgba(255,255,255,0.25)`
+          : `0 0 ${size * 0.4}px ${theme.glow}60, inset 0 1px 0 rgba(255,255,255,0.15)`,
       }}
     >
-      {isHighRarity && (
+      {isCosmic && (
+        <>
+          <motion.div
+            className="absolute inset-0 rounded-2xl"
+            style={{ background: `conic-gradient(from 0deg, ${theme.bg1}40, ${theme.ring}70, transparent, ${theme.bg1}40)` }}
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          />
+          <motion.div
+            className="absolute inset-0 rounded-2xl"
+            style={{ background: `conic-gradient(from 180deg, ${theme.ring}50, transparent, ${theme.bg1}50)` }}
+            animate={{ rotate: [360, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+          />
+        </>
+      )}
+      {isHighRarity && !isCosmic && (
         <motion.div
           className="absolute inset-0 rounded-2xl"
           style={{ background: `conic-gradient(from 0deg, ${theme.bg1}25, ${theme.ring}45, ${theme.bg1}25)` }}
@@ -224,12 +267,12 @@ function GiftVisual({ name, emoji, rarity, animationType, size = 64 }: {
       >
         <GiftArt name={name} size={size} />
       </motion.div>
-      {rarity === "legendary" && (
+      {(rarity === "legendary" || isCosmic) && (
         <motion.div
           className="absolute inset-0 rounded-2xl pointer-events-none"
-          style={{ background: `radial-gradient(circle at 50% 50%, ${theme.bg1}20, transparent 70%)` }}
-          animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.9, 0.4] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          style={{ background: `radial-gradient(circle at 50% 50%, ${theme.bg1}${isCosmic ? "35" : "20"}, transparent 70%)` }}
+          animate={{ scale: [1, 1.15, 1], opacity: isCosmic ? [0.6, 1, 0.6] : [0.4, 0.9, 0.4] }}
+          transition={{ duration: isCosmic ? 1.2 : 2, repeat: Infinity }}
         />
       )}
     </div>

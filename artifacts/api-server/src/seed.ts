@@ -43,6 +43,13 @@ const GIFT_CATALOG = [
   { name: "Пульс",           emoji: "💜",  animationType: "fireworks", rarity: "legendary", stars: 20, price: 100000, description: "Символ мессенджера Pulse" },
   { name: "Звезда",          emoji: "🌟",  animationType: "stars",     rarity: "legendary", stars: 25, price: 150000, description: "Легендарная путеводная звезда" },
   { name: "Бесконечность",   emoji: "♾️",  animationType: "galaxy",    rarity: "legendary", stars: 50, price: 250000, description: "Бесконечность и далее — высший подарок" },
+
+  // ── COSMIC (300000–1000000 ⚡) ─────────────────────────────────────────
+  { name: "Нейтронная звезда", emoji: "💥", animationType: "supernova", rarity: "cosmic", stars: 60,  price: 300000,  description: "Сверхплотная звезда с невероятной энергией" },
+  { name: "Квазар",            emoji: "🌠", animationType: "supernova", rarity: "cosmic", stars: 75,  price: 500000,  description: "Мощнейший источник света во вселенной" },
+  { name: "Чёрная дыра",       emoji: "🌀", animationType: "vortex",    rarity: "cosmic", stars: 90,  price: 750000,  description: "Точка, из которой нет возврата" },
+  { name: "Мультивселенная",   emoji: "🪩", animationType: "vortex",    rarity: "cosmic", stars: 99,  price: 900000,  description: "Бесконечное множество параллельных миров" },
+  { name: "Абсолют",           emoji: "⚜️", animationType: "supernova", rarity: "cosmic", stars: 100, price: 1000000, description: "Абсолютное совершенство — предел возможного" },
 ];
 
 const SYSTEM_USERS = [

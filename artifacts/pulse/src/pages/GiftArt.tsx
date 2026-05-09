@@ -975,26 +975,248 @@ export function GiftArt({ name, size = 64 }: { name: string; size?: number }) {
           </linearGradient>
           <filter id={`${p}-f`}><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
-        {/* Stars */}
         {[[10,15],[90,12],[8,80],[92,78],[50,8],[50,92]].map(([x,y],i) => (
           <circle key={i} cx={x} cy={y} r="2" fill="white" opacity="0.5"/>
         ))}
-        {/* Glow */}
         <path d="M20 50 C20 30, 46 30, 50 50 C54 70, 80 70, 80 50 C80 30, 54 30, 50 50 C46 70, 20 70, 20 50Z"
           fill="none" stroke={`url(#${p}-a)`} strokeWidth="14" strokeLinecap="round"
           filter={`url(#${p}-f)`} opacity="0.5"/>
-        {/* Main ∞ */}
         <path d="M20 50 C20 30, 46 30, 50 50 C54 70, 80 70, 80 50 C80 30, 54 30, 50 50 C46 70, 20 70, 20 50Z"
           fill="none" stroke={`url(#${p}-a)`} strokeWidth="8" strokeLinecap="round"/>
-        {/* Inner shine */}
         <path d="M20 50 C20 34, 42 34, 50 50" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="3" strokeLinecap="round"/>
         <path d="M50 50 C58 66, 80 66, 80 50" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2" strokeLinecap="round"/>
-        {/* Center dot */}
         <circle cx="50" cy="50" r="5" fill="white" opacity="0.9"/>
         <circle cx="50" cy="50" r="3" fill="#e040fb"/>
-        {/* Orbiting dots */}
         <circle cx="28" cy="42" r="3.5" fill="#4dd0e1" opacity="0.9"/>
         <circle cx="72" cy="58" r="3.5" fill="#ff4081" opacity="0.9"/>
+      </svg>
+    ),
+
+    // ── COSMIC ────────────────────────────────────────────────────────────────
+
+    "Нейтронная звезда": (
+      <svg viewBox="0 0 100 100" width={s} height={s}>
+        <defs>
+          <radialGradient id={`${p}-a`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ffffff"/>
+            <stop offset="30%" stopColor="#c7d2fe"/>
+            <stop offset="70%" stopColor="#6366f1"/>
+            <stop offset="100%" stopColor="#1e1b4b"/>
+          </radialGradient>
+          <radialGradient id={`${p}-b`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="1"/>
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0"/>
+          </radialGradient>
+          <filter id={`${p}-f`}><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id={`${p}-g`}><feGaussianBlur stdDeviation="2"/></filter>
+        </defs>
+        {/* Outer energy rings */}
+        {[38, 28, 18].map((r, i) => (
+          <circle key={i} cx="50" cy="50" r={r} fill="none"
+            stroke={`rgba(199,210,254,${0.15 - i*0.04})`} strokeWidth={3 - i*0.8}/>
+        ))}
+        {/* Energy beams */}
+        {[0,45,90,135,180,225,270,315].map((a, i) => {
+          const len = i % 2 === 0 ? 42 : 30;
+          return <line key={a}
+            x1={50 + 12*Math.cos(a*Math.PI/180)} y1={50 + 12*Math.sin(a*Math.PI/180)}
+            x2={50 + len*Math.cos(a*Math.PI/180)} y2={50 + len*Math.sin(a*Math.PI/180)}
+            stroke={i % 2 === 0 ? "#e0e7ff" : "#a5b4fc"} strokeWidth={i % 2 === 0 ? 2 : 1}
+            opacity={i % 2 === 0 ? 0.8 : 0.5} strokeLinecap="round"/>;
+        })}
+        {/* Core glow */}
+        <circle cx="50" cy="50" r="18" fill={`url(#${p}-a)`} filter={`url(#${p}-f)`}/>
+        <circle cx="50" cy="50" r="10" fill="white" opacity="0.9"/>
+        <circle cx="50" cy="50" r="6" fill="white"/>
+        {/* Inner brilliance */}
+        <ellipse cx="46" cy="46" rx="4" ry="3" fill={`url(#${p}-b)`} opacity="0.8"/>
+        {/* Background stars */}
+        {[[8,12],[88,18],[12,85],[90,80],[50,5],[5,50],[95,50],[50,95]].map(([x,y],i) => (
+          <circle key={i} cx={x} cy={y} r="1.5" fill="white" opacity={0.4 + (i%3)*0.2}/>
+        ))}
+      </svg>
+    ),
+
+    "Квазар": (
+      <svg viewBox="0 0 100 100" width={s} height={s}>
+        <defs>
+          <radialGradient id={`${p}-a`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#fefce8"/>
+            <stop offset="25%" stopColor="#fde047"/>
+            <stop offset="60%" stopColor="#f59e0b"/>
+            <stop offset="100%" stopColor="#1c1917"/>
+          </radialGradient>
+          <linearGradient id={`${p}-jet`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#fde047" stopOpacity="0"/>
+            <stop offset="50%" stopColor="#fef08a" stopOpacity="0.9"/>
+            <stop offset="100%" stopColor="#fde047" stopOpacity="0"/>
+          </linearGradient>
+          <filter id={`${p}-f`}><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        {/* Star field */}
+        {[[6,10],[88,8],[15,88],[92,85],[50,4],[3,50],[97,50]].map(([x,y],i) => (
+          <circle key={i} cx={x} cy={y} r="1.5" fill="white" opacity={0.3+i*0.07}/>
+        ))}
+        {/* Relativistic jets */}
+        <ellipse cx="50" cy="50" rx="45" ry="6" fill={`url(#${p}-jet)`} opacity="0.7" filter={`url(#${p}-f)`}/>
+        <ellipse cx="50" cy="50" rx="45" ry="3" fill={`url(#${p}-jet)`} opacity="0.9"/>
+        {/* Accretion disk */}
+        <ellipse cx="50" cy="50" rx="28" ry="8" fill="none" stroke="#fbbf24" strokeWidth="4" opacity="0.5" filter={`url(#${p}-f)`}/>
+        <ellipse cx="50" cy="50" rx="28" ry="8" fill="none" stroke="#fde047" strokeWidth="2" opacity="0.8"/>
+        {/* Core */}
+        <circle cx="50" cy="50" r="14" fill={`url(#${p}-a)`} filter={`url(#${p}-f)`}/>
+        <circle cx="50" cy="50" r="9" fill="#fefce8"/>
+        {/* Brilliance */}
+        <ellipse cx="45" cy="45" rx="4" ry="3" fill="white" opacity="0.8"/>
+        {/* Sparkles */}
+        {[[20,30],[80,30],[20,70],[80,70]].map(([x,y],i) => (
+          <g key={i}>
+            <line x1={x} y1={y-5} x2={x} y2={y+5} stroke="#fde047" strokeWidth="1.5" opacity="0.7"/>
+            <line x1={x-5} y1={y} x2={x+5} y2={y} stroke="#fde047" strokeWidth="1.5" opacity="0.7"/>
+          </g>
+        ))}
+      </svg>
+    ),
+
+    "Чёрная дыра": (
+      <svg viewBox="0 0 100 100" width={s} height={s}>
+        <defs>
+          <radialGradient id={`${p}-a`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#000000"/>
+            <stop offset="40%" stopColor="#09001a"/>
+            <stop offset="70%" stopColor="#3b0764"/>
+            <stop offset="100%" stopColor="#6d28d9" stopOpacity="0"/>
+          </radialGradient>
+          <radialGradient id={`${p}-ring`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#7c3aed" stopOpacity="0"/>
+            <stop offset="60%" stopColor="#7c3aed" stopOpacity="0.6"/>
+            <stop offset="75%" stopColor="#a855f7" stopOpacity="0.9"/>
+            <stop offset="85%" stopColor="#7c3aed" stopOpacity="0.6"/>
+            <stop offset="100%" stopColor="#6d28d9" stopOpacity="0"/>
+          </radialGradient>
+          <filter id={`${p}-f`}><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        {/* Distorted background stars */}
+        {[[8,12],[88,15],[10,80],[90,82],[50,5],[50,92],[4,48],[96,52]].map(([x,y],i) => (
+          <ellipse key={i} cx={x} cy={y} rx="1.5" ry="1" fill="white" opacity={0.3 + i*0.06}
+            transform={`rotate(${(x-50)*2} ${x} ${y})`}/>
+        ))}
+        {/* Photon ring glow */}
+        <circle cx="50" cy="50" r="34" fill="none" stroke="#7c3aed" strokeWidth="10"
+          opacity="0.15" filter={`url(#${p}-f)`}/>
+        {/* Accretion disk rings */}
+        {[34, 30, 26].map((r, i) => (
+          <circle key={i} cx="50" cy="50" r={r} fill="none"
+            stroke={`rgba(168,85,247,${0.6 - i * 0.18})`} strokeWidth={3 - i * 0.7}/>
+        ))}
+        {/* Event horizon */}
+        <circle cx="50" cy="50" r="22" fill={`url(#${p}-a)`} filter={`url(#${p}-f)`}/>
+        <circle cx="50" cy="50" r="16" fill="#000000"/>
+        {/* Hawking glow */}
+        <circle cx="50" cy="50" r="17" fill="none" stroke="#a855f7" strokeWidth="1.5" opacity="0.5"/>
+        {/* Gravitational lensing streaks */}
+        {[0,60,120,180,240,300].map((a, i) => (
+          <line key={i}
+            x1={50 + 24*Math.cos(a*Math.PI/180)} y1={50 + 24*Math.sin(a*Math.PI/180)}
+            x2={50 + 42*Math.cos((a+8)*Math.PI/180)} y2={50 + 42*Math.sin((a+8)*Math.PI/180)}
+            stroke="#c084fc" strokeWidth="1" opacity="0.4"/>
+        ))}
+      </svg>
+    ),
+
+    "Мультивселенная": (
+      <svg viewBox="0 0 100 100" width={s} height={s}>
+        <defs>
+          <radialGradient id={`${p}-a`} cx="40%" cy="40%" r="60%">
+            <stop offset="0%" stopColor="#f0abfc"/>
+            <stop offset="100%" stopColor="#7e22ce"/>
+          </radialGradient>
+          <radialGradient id={`${p}-b`} cx="60%" cy="60%" r="60%">
+            <stop offset="0%" stopColor="#67e8f9"/>
+            <stop offset="100%" stopColor="#0e7490"/>
+          </radialGradient>
+          <radialGradient id={`${p}-c`} cx="50%" cy="30%" r="60%">
+            <stop offset="0%" stopColor="#fde68a"/>
+            <stop offset="100%" stopColor="#b45309"/>
+          </radialGradient>
+          <filter id={`${p}-f`}><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        {/* Universe bubbles */}
+        <circle cx="38" cy="42" r="22" fill={`url(#${p}-a)`} opacity="0.7" filter={`url(#${p}-f)`}/>
+        <circle cx="62" cy="58" r="20" fill={`url(#${p}-b)`} opacity="0.7" filter={`url(#${p}-f)`}/>
+        <circle cx="50" cy="32" r="14" fill={`url(#${p}-c)`} opacity="0.65" filter={`url(#${p}-f)`}/>
+        {/* Universe borders */}
+        <circle cx="38" cy="42" r="22" fill="none" stroke="rgba(240,171,252,0.6)" strokeWidth="1.5"/>
+        <circle cx="62" cy="58" r="20" fill="none" stroke="rgba(103,232,249,0.6)" strokeWidth="1.5"/>
+        <circle cx="50" cy="32" r="14" fill="none" stroke="rgba(253,230,138,0.6)" strokeWidth="1"/>
+        {/* Inner highlights */}
+        <ellipse cx="32" cy="36" rx="7" ry="5" fill="rgba(255,255,255,0.3)" transform="rotate(-30 32 36)"/>
+        <ellipse cx="56" cy="52" rx="6" ry="4" fill="rgba(255,255,255,0.25)" transform="rotate(20 56 52)"/>
+        <ellipse cx="46" cy="28" rx="5" ry="3" fill="rgba(255,255,255,0.3)" transform="rotate(-15 46 28)"/>
+        {/* Connection sparks */}
+        {[[47,52],[53,43],[45,40]].map(([x,y],i) => (
+          <circle key={i} cx={x} cy={y} r="2.5" fill="white" opacity="0.7"/>
+        ))}
+        {/* Background stars */}
+        {[[6,6],[92,8],[8,92],[94,90],[50,97],[97,50]].map(([x,y],i) => (
+          <circle key={i} cx={x} cy={y} r="1.5" fill="white" opacity="0.4"/>
+        ))}
+      </svg>
+    ),
+
+    "Абсолют": (
+      <svg viewBox="0 0 100 100" width={s} height={s}>
+        <defs>
+          <radialGradient id={`${p}-a`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ffffff"/>
+            <stop offset="30%" stopColor="#f0f9ff"/>
+            <stop offset="65%" stopColor="#bae6fd"/>
+            <stop offset="100%" stopColor="#0c4a6e" stopOpacity="0"/>
+          </radialGradient>
+          <linearGradient id={`${p}-b`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ffffff"/>
+            <stop offset="50%" stopColor="#bae6fd"/>
+            <stop offset="100%" stopColor="#7dd3fc"/>
+          </linearGradient>
+          <filter id={`${p}-f`}><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id={`${p}-g`}><feGaussianBlur stdDeviation="2"/></filter>
+        </defs>
+        {/* Outer divine rays */}
+        {Array.from({length: 16}, (_, i) => {
+          const a = i * (360/16) * Math.PI / 180;
+          const inner = i % 2 === 0 ? 20 : 16;
+          const outer = i % 2 === 0 ? 46 : 36;
+          return <line key={i}
+            x1={50 + inner*Math.cos(a)} y1={50 + inner*Math.sin(a)}
+            x2={50 + outer*Math.cos(a)} y2={50 + outer*Math.sin(a)}
+            stroke="white" strokeWidth={i % 2 === 0 ? 2 : 1} opacity={i % 2 === 0 ? 0.6 : 0.35}
+            strokeLinecap="round"/>;
+        })}
+        {/* Halo rings */}
+        {[42, 36, 30].map((r, i) => (
+          <circle key={i} cx="50" cy="50" r={r} fill="none"
+            stroke={`rgba(186,230,253,${0.25 - i * 0.07})`} strokeWidth={2 - i * 0.5}/>
+        ))}
+        {/* Core glow layers */}
+        <circle cx="50" cy="50" r="22" fill={`url(#${p}-a)`} filter={`url(#${p}-f)`}/>
+        <circle cx="50" cy="50" r="16" fill="white" opacity="0.95"/>
+        <circle cx="50" cy="50" r="11" fill="white"/>
+        {/* Divine symbol — fleur de lis / ornament */}
+        <path d="M50 36 C50 36, 55 42, 50 50 C45 42, 50 36, 50 36Z" fill={`url(#${p}-b)`}/>
+        <path d="M50 64 C50 64, 55 58, 50 50 C45 58, 50 64, 50 64Z" fill={`url(#${p}-b)`}/>
+        <path d="M36 50 C36 50, 42 45, 50 50 C42 55, 36 50, 36 50Z" fill={`url(#${p}-b)`}/>
+        <path d="M64 50 C64 50, 58 45, 50 50 C58 55, 64 50, 64 50Z" fill={`url(#${p}-b)`}/>
+        <circle cx="50" cy="50" r="5" fill="white"/>
+        {/* Brilliance spot */}
+        <ellipse cx="44" cy="44" rx="5" ry="3.5" fill="white" opacity="0.9" transform="rotate(-35 44 44)"/>
+        {/* Far sparkles */}
+        {[[10,10],[90,10],[10,90],[90,90],[50,5],[5,50],[95,50],[50,95]].map(([x,y],i) => (
+          <g key={i}>
+            <circle cx={x} cy={y} r="2" fill="white" opacity="0.5"/>
+            <line x1={x} y1={y-4} x2={x} y2={y+4} stroke="white" strokeWidth="1" opacity="0.4"/>
+            <line x1={x-4} y1={y} x2={x+4} y2={y} stroke="white" strokeWidth="1" opacity="0.4"/>
+          </g>
+        ))}
       </svg>
     ),
   };

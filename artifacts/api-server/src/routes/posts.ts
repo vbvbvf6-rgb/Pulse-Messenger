@@ -13,17 +13,91 @@ interface ModerationResult {
   reason: string;
 }
 
+// ── Local keyword-based first-pass filter ─────────────────────────────────
+// Catches obvious Russian/English insults without needing an AI call.
+const INSULT_PATTERNS = [
+  // Russian mat and heavy insults (partial matches)
+  /\bмудак|мудил[ао]|мудозвон/i,
+  /\bдебил|дебильн/i,
+  /\bидиот|идиотк/i,
+  /\bтупица|тупой\s+[^\s]+|тупорыл/i,
+  /\bпридурок|придурк/i,
+  /\bурод|уродин/i,
+  /\bкозёл|козел\b|козлин/i,
+  /\bлох\b|лошар/i,
+  /\bбаран\b|барани/i,
+  /\bдрочил|долбоёб|долбоеб/i,
+  /\bпиздабол|пиздёж/i,
+  /\bсволочь\b|сволоч/i,
+  /\bублюдок|ублюдк/i,
+  /\bпадла\b|падлюк/i,
+  /\bохуел|охуеть|офигел/i,
+  /\bзаткнись|заткни\s+пасть/i,
+  /\bшлюха|шлюхи|шлюху/i,
+  /\bпроститутк/i,
+  /\bнигг[еэ]р|нигр[еа]/i,
+  /\bчурк[аио]/i,
+  /\bхохол|хохлы/i,
+  /\bкацап/i,
+  /\bпидор|пидар|пидр/i,
+  /\bгандон/i,
+  /\bебан[ыуое]|ёбан[ыуое]/i,
+  /\bеблан|ёблан/i,
+  /\bмразь\b|мрази/i,
+  /\bтварь\b|твари\b/i,
+  /\bскотин[аы]/i,
+  /\bублюдок/i,
+  /\bнегодяй/i,
+  /\bзлодей/i,
+  // English heavy insults
+  /\bfuck\s+you\b/i,
+  /\bkill\s+yourself\b/i,
+  /\bkys\b/i,
+  /\bass\s*hole\b/i,
+  /\bmother\s*fuck/i,
+  /\bnigger\b|\bnigga\b/i,
+  /\bcunt\b/i,
+  /\bfaggot\b/i,
+  /\bretard\b/i,
+  /\bgo\s+die\b/i,
+  /\bi\s+hate\s+you\b/i,
+  /\bwhore\b/i,
+  /\bbitch\b.*\bstupid|stupid.*\bbitch\b/i,
+  // Calls to violence
+  /убей\s+(себя|его|её|их|всех)/i,
+  /\bубийца\b.*ты|ты.*\bубийца\b/i,
+];
+
+function localModerationCheck(text: string): ModerationResult | null {
+  const lower = text.toLowerCase();
+  for (const pattern of INSULT_PATTERNS) {
+    if (pattern.test(lower)) {
+      return {
+        flagged: true,
+        categories: ["harassment"],
+        confidence: 95,
+        reason: "Обнаружены оскорбления или нецензурная лексика",
+      };
+    }
+  }
+  return null;
+}
+
 async function moderateContent(text: string): Promise<ModerationResult> {
   const safe: ModerationResult = { flagged: false, categories: [], confidence: 0, reason: "" };
   if (!text || text.trim().length < 5) return safe;
 
-  const systemPrompt = `You are a content moderation AI. Analyze the following post text and return ONLY a JSON object (no markdown, no explanation) with:
+  // Run local keyword filter first — instant, no API call needed
+  const localResult = localModerationCheck(text);
+  if (localResult) return localResult;
+
+  const systemPrompt = `You are a strict content moderation AI for a social platform. Analyze the post text and return ONLY a JSON object (no markdown, no explanation) with:
 - "flagged": boolean (true if content violates rules)
-- "categories": array of violated categories from: ["spam","hate_speech","adult_content","violence","harassment","misinformation","self_harm"]
-- "confidence": integer 0-100 (how confident you are in the flag)
+- "categories": array from: ["spam","hate_speech","adult_content","violence","harassment","misinformation","self_harm"]
+- "confidence": integer 0-100
 - "reason": string (short explanation in Russian, max 100 chars, empty if not flagged)
 
-Rules: Flag content with hate speech, explicit sexual content, calls to violence, severe harassment, dangerous self-harm content, or obvious spam. Normal opinions, mild language, and controversial topics are NOT flagged. Be conservative — only flag clear violations.`;
+Flag ANY of the following: insults directed at a person or group, name-calling, mockery, humiliation, hate speech, slurs, calls to violence, explicit content, severe harassment, dangerous self-harm encouragement, or obvious spam. Do NOT allow personal attacks even if phrased subtly. Return flagged=true for any post containing insults, toxic language, or degrading content targeting real people.`;
 
   const tryModerate = async (model: string): Promise<ModerationResult | null> => {
     try {
@@ -124,7 +198,7 @@ router.post("/posts", async (req, res) => {
     setImmediate(async () => {
       try {
         const result = await moderateContent(text);
-        if (result.flagged && result.confidence >= 65) {
+        if (result.flagged && result.confidence >= 40) {
           await db.execute(sql`
             UPDATE posts SET
               moderation_status = 'rejected',
