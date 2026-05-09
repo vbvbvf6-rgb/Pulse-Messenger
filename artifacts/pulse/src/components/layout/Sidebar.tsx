@@ -119,7 +119,9 @@ export function Sidebar({ mobileSidebarOpen, onMobileClose, onMobileOpen }: Side
     setIsAdmin(false);
     if (!currentUserId) return;
     if (ADMIN_USER_IDS.includes(currentUserId)) { setIsAdmin(true); return; }
-    fetch("/api/admin/check", { headers: { "x-user-id": String(currentUserId) } })
+    const _token = localStorage.getItem("pulse-token");
+    const _adminHeader = _token ? { "Authorization": `Bearer ${_token}` } : { "x-user-id": String(currentUserId) };
+    fetch("/api/admin/check", { headers: _adminHeader })
       .then(r => r.json())
       .then(d => { setIsAdmin(d.isAdmin === true); })
       .catch(() => { setIsAdmin(false); });
@@ -173,12 +175,14 @@ export function Sidebar({ mobileSidebarOpen, onMobileClose, onMobileOpen }: Side
   );
 
   const openSupportChat = async () => {
-    const uid = localStorage.getItem("pulse-user-id");
-    if (!uid) return;
+    const _tok = localStorage.getItem("pulse-token");
+    const _uid = localStorage.getItem("pulse-user-id");
+    if (!_tok && !_uid) return;
+    const _authHdr = _tok ? { "Authorization": `Bearer ${_tok}` } : { "x-user-id": _uid! };
     try {
       const chatRes = await fetch("/api/chats/direct", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": uid },
+        headers: { "Content-Type": "application/json", ..._authHdr },
         body: JSON.stringify({ userId: 1 }),
       });
       if (chatRes.ok) {

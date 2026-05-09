@@ -1,11 +1,24 @@
 import { Router } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 import { createHash } from "node:crypto";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "../app";
 
 const router = Router();
+const SALT_ROUNDS = 12;
+const TOKEN_TTL = "30d";
 
-const hash = (pass: string) => createHash("sha256").update(pass).digest("hex");
+const sha256 = (pass: string) => createHash("sha256").update(pass).digest("hex");
+
+function signToken(userId: number): string {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: TOKEN_TTL });
+}
+
+function sanitizeUsername(u: string): string {
+  return u.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+}
 
 router.post("/auth/login", async (req, res) => {
   try {
@@ -13,23 +26,51 @@ router.post("/auth/login", async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({ error: "Укажите никнейм и пароль" });
     }
+    if (String(username).length > 100 || String(password).length > 200) {
+      return res.status(400).json({ error: "Неверное имя или пароль" });
+    }
+
     const rows = await db.execute(
-      sql`SELECT id, username, display_name, avatar_color, avatar_url, bio, status, status_text, is_verified, is_bot, created_at, balance, password_hash
+      sql`SELECT id, username, display_name, avatar_color, avatar_url, bio, status, status_text,
+                 is_verified, is_bot, created_at, balance, password_hash,
+                 COALESCE(is_banned, false) as is_banned
           FROM users
-          WHERE LOWER(username) = LOWER(${String(username)})
-             OR LOWER(display_name) = LOWER(${String(username)})
-          ORDER BY CASE WHEN LOWER(username) = LOWER(${String(username)}) THEN 0 ELSE 1 END
+          WHERE LOWER(username) = LOWER(${String(username).trim()})
+             OR LOWER(display_name) = LOWER(${String(username).trim()})
+          ORDER BY CASE WHEN LOWER(username) = LOWER(${String(username).trim()}) THEN 0 ELSE 1 END
           LIMIT 1`
     );
     const user = rows.rows[0] as any;
     if (!user) {
       return res.status(401).json({ error: "Неверное имя или пароль" });
     }
-    if (!user.password_hash || user.password_hash !== hash(String(password))) {
+    if (user.is_banned) {
+      return res.status(403).json({ error: "Ваш аккаунт заблокирован. Обратитесь к администратору." });
+    }
+
+    const pass = String(password);
+    let passwordValid = false;
+    const storedHash: string = user.password_hash || "";
+
+    if (storedHash.startsWith("$2")) {
+      passwordValid = await bcrypt.compare(pass, storedHash);
+    } else {
+      passwordValid = storedHash === sha256(pass);
+      if (passwordValid) {
+        const newHash = await bcrypt.hash(pass, SALT_ROUNDS);
+        await db.execute(sql`UPDATE users SET password_hash = ${newHash} WHERE id = ${user.id}`);
+      }
+    }
+
+    if (!passwordValid) {
       return res.status(401).json({ error: "Неверное имя или пароль" });
     }
+
+    const token = signToken(user.id);
+
     res.json({
       userId: user.id,
+      token,
       user: {
         id: user.id,
         username: user.username,
@@ -56,15 +97,26 @@ router.post("/auth/register", async (req, res) => {
     if (!username || !displayName || !password) {
       return res.status(400).json({ error: "Заполните все поля" });
     }
-    if (String(username).length < 3) {
-      return res.status(400).json({ error: "Никнейм должен быть не менее 3 символов" });
+
+    const rawUsername = String(username).trim();
+    const rawDisplay = String(displayName).trim();
+    const rawPass = String(password);
+
+    if (rawUsername.length < 3 || rawUsername.length > 32) {
+      return res.status(400).json({ error: "Никнейм должен быть от 3 до 32 символов" });
     }
-    if (String(password).length < 6) {
-      return res.status(400).json({ error: "Пароль должен быть не менее 6 символов" });
+    if (!/^[a-zA-Z0-9_]+$/.test(rawUsername)) {
+      return res.status(400).json({ error: "Никнейм может содержать только буквы, цифры и _" });
+    }
+    if (rawDisplay.length < 1 || rawDisplay.length > 60) {
+      return res.status(400).json({ error: "Имя должно быть от 1 до 60 символов" });
+    }
+    if (rawPass.length < 6 || rawPass.length > 200) {
+      return res.status(400).json({ error: "Пароль должен быть от 6 до 200 символов" });
     }
 
     const existing = await db.execute(
-      sql`SELECT id FROM users WHERE username = ${String(username)}`
+      sql`SELECT id FROM users WHERE LOWER(username) = LOWER(${rawUsername})`
     );
     if ((existing.rows as any[]).length > 0) {
       return res.status(409).json({ error: "Этот никнейм уже занят" });
@@ -72,10 +124,11 @@ router.post("/auth/register", async (req, res) => {
 
     const COLORS = ["#3B82F6","#EC4899","#10B981","#F59E0B","#8B5CF6","#06B6D4","#EF4444","#F97316"];
     const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const passwordHash = await bcrypt.hash(rawPass, SALT_ROUNDS);
 
     const result = await db.execute(
       sql`INSERT INTO users (username, display_name, avatar_color, status, password_hash, balance, age_group)
-          VALUES (${String(username)}, ${String(displayName)}, ${color}, 'online', ${hash(String(password))}, 0, ${ageGroup ? String(ageGroup) : null})
+          VALUES (${rawUsername}, ${rawDisplay}, ${color}, 'online', ${passwordHash}, 0, ${ageGroup ? String(ageGroup) : null})
           RETURNING id, username, display_name, avatar_color, status, created_at, balance`
     );
     const newUser = result.rows[0] as any;
@@ -87,11 +140,13 @@ router.post("/auth/register", async (req, res) => {
             FROM chats WHERE type IN ('group', 'channel') AND id IN (2, 3)
             ON CONFLICT DO NOTHING`
       );
-    } catch {
-    }
+    } catch {}
+
+    const token = signToken(newUser.id);
 
     res.status(201).json({
       userId: newUser.id,
+      token,
       user: {
         id: newUser.id,
         username: newUser.username,
@@ -115,16 +170,30 @@ router.post("/auth/change-password", async (req, res) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: "Укажите текущий и новый пароль" });
     }
-    if (String(newPassword).length < 6) {
-      return res.status(400).json({ error: "Новый пароль должен быть не менее 6 символов" });
+    if (String(newPassword).length < 6 || String(newPassword).length > 200) {
+      return res.status(400).json({ error: "Новый пароль должен быть от 6 до 200 символов" });
     }
+
     const rows = await db.execute(sql`SELECT password_hash FROM users WHERE id = ${uid}`);
     const user = rows.rows[0] as any;
-    if (!user || user.password_hash !== hash(String(currentPassword))) {
+    if (!user) return res.status(404).json({ error: "Пользователь не найден" });
+
+    const storedHash: string = user.password_hash || "";
+    let valid = false;
+    if (storedHash.startsWith("$2")) {
+      valid = await bcrypt.compare(String(currentPassword), storedHash);
+    } else {
+      valid = storedHash === sha256(String(currentPassword));
+    }
+
+    if (!valid) {
       return res.status(401).json({ error: "Неверный текущий пароль" });
     }
-    await db.execute(sql`UPDATE users SET password_hash = ${hash(String(newPassword))} WHERE id = ${uid}`);
-    res.json({ success: true, message: "Пароль успешно изменён" });
+
+    const newHash = await bcrypt.hash(String(newPassword), SALT_ROUNDS);
+    await db.execute(sql`UPDATE users SET password_hash = ${newHash} WHERE id = ${uid}`);
+    const newToken = signToken(uid);
+    res.json({ success: true, message: "Пароль успешно изменён", token: newToken });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Ошибка сервера" });

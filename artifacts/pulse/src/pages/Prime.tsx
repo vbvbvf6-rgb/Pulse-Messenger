@@ -59,10 +59,12 @@ export default function Prime() {
   const handleSubscribe = async () => {
     setLoading(true);
     try {
-      const uid = localStorage.getItem("pulse-user-id");
+      const _primeToken = localStorage.getItem("pulse-token");
+      const _primeUid = localStorage.getItem("pulse-user-id");
+      const _primeAuth = _primeToken ? { "Authorization": `Bearer ${_primeToken}` } : _primeUid ? { "x-user-id": _primeUid } : {};
       const res = await fetch("/api/prime/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": uid ?? "" },
+        headers: { "Content-Type": "application/json", ..._primeAuth },
         body: JSON.stringify({ planId: selected }),
       });
       const data = await res.json();

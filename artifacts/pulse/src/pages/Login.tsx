@@ -33,6 +33,7 @@ export default function Login({ onLogin }: LoginProps) {
         setError(data.error || "Неверный никнейм или пароль");
         return;
       }
+      if (data.token) localStorage.setItem("pulse-token", data.token);
       localStorage.setItem("pulse-user-id", String(data.userId));
       localStorage.setItem("pulse-user", JSON.stringify(data.user));
       onLogin(data.userId);

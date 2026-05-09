@@ -105,8 +105,13 @@ export function MessageBubble({ message, onReply, onEdit }: MessageBubbleProps) 
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
-  const uid = localStorage.getItem("pulse-user-id");
-  const headers = uid ? { "x-user-id": uid, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem("pulse-token");
+    if (token) return { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+    const uid = localStorage.getItem("pulse-user-id");
+    return uid ? { "x-user-id": uid, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+  };
+  const headers = getAuthHeaders();
 
   const openMenu = useCallback((x: number, y: number) => {
     setMenuPos({ x, y });
@@ -177,7 +182,7 @@ export function MessageBubble({ message, onReply, onEdit }: MessageBubbleProps) 
     closeMenu();
     setActionLoading("delete");
     try {
-      await fetch(`/api/messages/${message.id}`, { method: "DELETE", headers: uid ? { "x-user-id": uid } : {} });
+      await fetch(`/api/messages/${message.id}`, { method: "DELETE", headers: getAuthHeaders() });
       queryClient.invalidateQueries({ queryKey: getGetMessagesQueryKey({ chatId: message.chatId }) });
     } catch {}
     setActionLoading(null);

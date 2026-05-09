@@ -4,6 +4,7 @@ export interface SavedAccount {
   username: string;
   avatarUrl: string | null;
   avatarColor: string;
+  token?: string;
 }
 
 const KEY = "pulse-accounts";
@@ -28,4 +29,25 @@ export function saveAccount(account: SavedAccount) {
 export function removeAccount(userId: number) {
   const accounts = getSavedAccounts().filter(a => a.userId !== userId);
   localStorage.setItem(KEY, JSON.stringify(accounts));
+}
+
+export function getActiveToken(): string | null {
+  return localStorage.getItem("pulse-token");
+}
+
+export function setActiveToken(token: string | null) {
+  if (token) {
+    localStorage.setItem("pulse-token", token);
+  } else {
+    localStorage.removeItem("pulse-token");
+  }
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = getActiveToken();
+  if (token) {
+    return { "Authorization": `Bearer ${token}` };
+  }
+  const uid = localStorage.getItem("pulse-user-id");
+  return uid ? { "x-user-id": uid } : {};
 }

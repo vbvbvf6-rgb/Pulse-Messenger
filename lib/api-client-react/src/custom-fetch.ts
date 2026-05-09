@@ -358,11 +358,16 @@ export async function customFetch<T = unknown>(
     }
   }
 
-  // Attach current user ID header for server-side auth
-  if (!headers.has("x-user-id")) {
-    const userId = typeof localStorage !== "undefined" ? localStorage.getItem("pulse-user-id") : null;
-    if (userId) {
-      headers.set("x-user-id", userId);
+  // Attach JWT bearer token or fallback x-user-id for auth
+  if (!headers.has("authorization")) {
+    const token = typeof localStorage !== "undefined" ? localStorage.getItem("pulse-token") : null;
+    if (token) {
+      headers.set("authorization", `Bearer ${token}`);
+    } else {
+      const userId = typeof localStorage !== "undefined" ? localStorage.getItem("pulse-user-id") : null;
+      if (userId) {
+        headers.set("x-user-id", userId);
+      }
     }
   }
 

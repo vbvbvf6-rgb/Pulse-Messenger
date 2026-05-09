@@ -130,15 +130,21 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
     };
   }, []);
 
-  const sendTypingEvent = () => {
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem("pulse-token");
+    if (token) return { "Authorization": `Bearer ${token}` };
     const uid = localStorage.getItem("pulse-user-id");
+    return uid ? { "x-user-id": uid } : {};
+  };
+
+  const sendTypingEvent = () => {
     if (!typingTimeoutRef.current) {
-      fetch(`/api/chats/${chatId}/typing`, { method: "POST", headers: uid ? { "x-user-id": uid } : {} }).catch(() => {});
+      fetch(`/api/chats/${chatId}/typing`, { method: "POST", headers: getAuthHeaders() }).catch(() => {});
       typingTimeoutRef.current = setTimeout(() => { typingTimeoutRef.current = null; }, 2500);
     }
     if (stopTypingTimeoutRef.current) clearTimeout(stopTypingTimeoutRef.current);
     stopTypingTimeoutRef.current = setTimeout(() => {
-      fetch(`/api/chats/${chatId}/typing/stop`, { method: "POST", headers: uid ? { "x-user-id": uid } : {} }).catch(() => {});
+      fetch(`/api/chats/${chatId}/typing/stop`, { method: "POST", headers: getAuthHeaders() }).catch(() => {});
       stopTypingTimeoutRef.current = null;
       if (typingTimeoutRef.current) { clearTimeout(typingTimeoutRef.current); typingTimeoutRef.current = null; }
     }, 3000);
@@ -158,8 +164,7 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
     e?.preventDefault();
     if (isSending) return;
 
-    const uid = localStorage.getItem("pulse-user-id");
-    const headers: Record<string, string> = { "Content-Type": "application/json", ...(uid ? { "x-user-id": uid } : {}) };
+    const headers: Record<string, string> = { "Content-Type": "application/json", ...getAuthHeaders() };
 
     if (editMessage) {
       if (!text.trim()) return;

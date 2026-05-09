@@ -64,7 +64,9 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         username: data.user?.username || username.trim(),
         avatarUrl: data.user?.avatarUrl || null,
         avatarColor: data.user?.avatarColor || "#3B82F6",
+        token: data.token,
       });
+      if (data.token) localStorage.setItem("pulse-token", data.token);
       localStorage.setItem("pulse-user-id", String(data.userId));
       localStorage.setItem("pulse-user", JSON.stringify(data.user));
       resetForm();
@@ -99,7 +101,9 @@ export function AddAccountDialog({ open, onClose, onAccountAdded }: AddAccountDi
         username: data.user?.username || username.trim(),
         avatarUrl: data.user?.avatarUrl || null,
         avatarColor: data.user?.avatarColor || "#3B82F6",
+        token: data.token,
       });
+      if (data.token) localStorage.setItem("pulse-token", data.token);
       localStorage.setItem("pulse-user-id", String(data.userId));
       localStorage.setItem("pulse-user", JSON.stringify(data.user));
       resetForm();

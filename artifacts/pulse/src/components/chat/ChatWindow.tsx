@@ -183,12 +183,19 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     });
   };
 
+  const getCWAuthHeaders = (json?: boolean): Record<string, string> => {
+    const token = localStorage.getItem("pulse-token");
+    const base = token
+      ? { "Authorization": `Bearer ${token}` }
+      : (() => { const uid = localStorage.getItem("pulse-user-id"); return uid ? { "x-user-id": uid } : {}; })();
+    return json ? { "Content-Type": "application/json", ...base } : base;
+  };
+
   const handleTogglePin = () => {
     if (!chat) return;
-    const uid = localStorage.getItem("pulse-user-id");
     fetch(`/api/chats/${chatId}/pin`, {
       method: "PUT",
-      headers: uid ? { "x-user-id": uid } : {},
+      headers: getCWAuthHeaders(),
     }).then(() => {
       queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() });
     });
@@ -197,10 +204,9 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const handleDeleteChat = async () => {
     setIsDeleting(true);
     try {
-      const uid = localStorage.getItem("pulse-user-id");
       await fetch(`/api/chats/${chatId}`, {
         method: "DELETE",
-        headers: uid ? { "x-user-id": uid } : {},
+        headers: getCWAuthHeaders(),
       });
       queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() });
       setSelectedChatId(null);
@@ -212,13 +218,9 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const handleSetAutoDelete = async (seconds: number | null) => {
     setAutoDeleteLoading(true);
     try {
-      const uid = localStorage.getItem("pulse-user-id");
       await fetch(`/api/chats/${chatId}/auto-delete`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(uid ? { "x-user-id": uid } : {}),
-        },
+        headers: getCWAuthHeaders(true),
         body: JSON.stringify({ timer: seconds }),
       });
       queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() });

@@ -129,6 +129,11 @@ function App() {
     const accounts = getSavedAccounts();
     const acc = accounts.find(a => a.userId === id);
     if (!acc) return;
+    if (acc.token) {
+      localStorage.setItem("pulse-token", acc.token);
+    } else {
+      localStorage.removeItem("pulse-token");
+    }
     localStorage.setItem("pulse-user-id", String(id));
     localStorage.setItem("pulse-user", JSON.stringify({
       id: acc.userId,
@@ -149,6 +154,7 @@ function App() {
       } else {
         localStorage.removeItem("pulse-user-id");
         localStorage.removeItem("pulse-user");
+        localStorage.removeItem("pulse-token");
         queryClient.clear();
         setUserId(null);
       }
@@ -160,9 +166,13 @@ function App() {
     if (currentId) removeAccount(currentId);
     localStorage.removeItem("pulse-user-id");
     localStorage.removeItem("pulse-user");
+    localStorage.removeItem("pulse-token");
     const remaining = getSavedAccounts();
     if (remaining.length > 0) {
       const acc = remaining[0];
+      if (acc.token) {
+        localStorage.setItem("pulse-token", acc.token);
+      }
       localStorage.setItem("pulse-user-id", String(acc.userId));
       localStorage.setItem("pulse-user", JSON.stringify({
         id: acc.userId,

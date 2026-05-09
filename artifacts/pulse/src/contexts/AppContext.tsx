@@ -78,10 +78,11 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
   const toggleTheme = () => setIsDark(prev => !prev);
   const logout = () => { onLogout(); };
 
-  const getUserHeaders = useCallback((): Record<string, string> => ({
-    "Content-Type": "application/json",
-    "x-user-id": String(currentUserIdRef.current),
-  }), []);
+  const getUserHeaders = useCallback((): Record<string, string> => {
+    const token = localStorage.getItem("pulse-token");
+    if (token) return { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
+    return { "Content-Type": "application/json", "x-user-id": String(currentUserIdRef.current) };
+  }, []);
 
   const cleanupCall = useCallback(() => {
     if (peerRef.current) {

@@ -112,6 +112,7 @@ export default function Register({ onLogin }: RegisterProps) {
         setError(data.error || "Ошибка регистрации");
         return;
       }
+      if (data.token) localStorage.setItem("pulse-token", data.token);
       localStorage.setItem("pulse-user-id", String(data.userId));
       localStorage.setItem("pulse-user", JSON.stringify(data.user));
       onLogin(data.userId);

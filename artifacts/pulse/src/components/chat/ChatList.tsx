@@ -90,12 +90,13 @@ export function ChatList({ onMenuClick }: { onMenuClick?: () => void }) {
   const [search, setSearch] = useState("");
 
   const openSupportChat = async () => {
+    const token = localStorage.getItem("pulse-token");
     const uid = localStorage.getItem("pulse-user-id");
-    if (!uid) return;
+    const authHeader = token ? { "Authorization": `Bearer ${token}` } : uid ? { "x-user-id": uid } : {};
     try {
       const chatRes = await fetch("/api/chats/direct", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-user-id": uid },
+        headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ userId: 1 }),
       });
       if (chatRes.ok) {
