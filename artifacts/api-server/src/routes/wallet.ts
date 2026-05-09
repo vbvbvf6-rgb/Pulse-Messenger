@@ -82,7 +82,6 @@ router.post("/wallet/daily-bonus", async (req, res) => {
     const uid = req.currentUserId;
     const BONUS = 1000;
     const today = new Date().toISOString().slice(0, 10);
-    const key = `daily_bonus_${today}`;
     const claimed = await db.execute(
       sql`SELECT 1 FROM user_daily_bonus WHERE user_id = ${uid} AND bonus_date = ${today} LIMIT 1`
     );

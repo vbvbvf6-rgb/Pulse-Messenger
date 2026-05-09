@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Zap, Copy, Check, Trophy, Star, MessageSquare, Phone, Gift,
   History, Shield, ChevronRight, ArrowUpRight, ArrowDownLeft,
-  AlertTriangle, CheckCircle2, TrendingUp, X, Package, Send
+  AlertTriangle, CheckCircle2, TrendingUp, X, Send
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -103,8 +103,9 @@ export default function Wallet() {
   const [tab, setTab] = useState<"tasks" | "history">("tasks");
   const [addressCopied, setAddressCopied] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
-  const [showBuyModal, setShowBuyModal] = useState(false);
-  const [buyLoading, setBuyLoading] = useState(false);
+  const [showBonusModal, setShowBonusModal] = useState(false);
+  const [bonusLoading, setBonusLoading] = useState(false);
+  const [bonusClaimed, setBonusClaimed] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendAddress, setSendAddress] = useState("");
   const [sendAmount, setSendAmount] = useState("");
@@ -116,6 +117,7 @@ export default function Wallet() {
   const tasksKey = `pulse-completed-tasks-${uid}`;
   const txKey = `pulse-tx-history-${uid}`;
   const loginKey = `pulse-last-login-${uid}`;
+  const bonusKey = `pulse-bonus-claimed-${uid}`;
 
   const fetchWallet = useCallback(async () => {
     try {
@@ -143,6 +145,8 @@ export default function Wallet() {
       const tasks: string[] = stored ? JSON.parse(stored) : [];
       if (!tasks.includes("daily_login")) earnTask("daily_login", 5, tasks);
     }
+    const lastBonus = localStorage.getItem(bonusKey);
+    if (lastBonus === today) setBonusClaimed(true);
   }, []);
 
   const earnTask = async (taskId: string, reward: number, currentCompleted?: string[]) => {
@@ -183,6 +187,40 @@ export default function Wallet() {
       return;
     }
     await earnTask(task.id, task.reward);
+  };
+
+  const handleDailyBonus = async () => {
+    setBonusLoading(true);
+    try {
+      const res = await fetch("/api/wallet/daily-bonus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getUserIdHeader() },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBalance(data.balance);
+        const today = new Date().toDateString();
+        localStorage.setItem(bonusKey, today);
+        setBonusClaimed(true);
+        const newTx: TxEntry = { id: `bonus-${Date.now()}`, type: "earn", amount: data.bonus, label: "Ежедневный бонус", time: new Date() };
+        const updated = [newTx, ...txHistory].slice(0, 50);
+        setTxHistory(updated);
+        localStorage.setItem(txKey, JSON.stringify(updated));
+        toast({ title: `+${data.bonus} ⚡ Spark!`, description: "Ежедневный бонус зачислен. Возвращайся завтра!" });
+        setShowBonusModal(false);
+      } else {
+        toast({ title: "Бонус недоступен", description: data.error || "Попробуйте позже", variant: "destructive" });
+        if (res.status === 409) {
+          const today = new Date().toDateString();
+          localStorage.setItem(bonusKey, today);
+          setBonusClaimed(true);
+          setShowBonusModal(false);
+        }
+      }
+    } catch {
+      toast({ title: "Ошибка сети", variant: "destructive" });
+    }
+    setBonusLoading(false);
   };
 
   const handleCopyAddress = () => {
@@ -318,11 +356,11 @@ export default function Wallet() {
                 <Send size={15} /> Отправить
               </button>
               <button
-                onClick={() => setShowBuyModal(true)}
-                className="flex-1 py-2.5 rounded-xl hover:opacity-90 transition text-sm font-semibold flex items-center justify-center gap-1.5"
+                onClick={() => setShowBonusModal(true)}
+                className={`flex-1 py-2.5 rounded-xl hover:opacity-90 transition text-sm font-semibold flex items-center justify-center gap-1.5 ${bonusClaimed ? "opacity-50 cursor-not-allowed" : ""}`}
                 style={{ background: "linear-gradient(135deg, #22d3ee, #7c3aed)" }}
               >
-                <Zap size={15} fill="white" /> Купить
+                <Zap size={15} fill="white" /> {bonusClaimed ? "Завтра" : "Бонус"}
               </button>
             </div>
           </motion.div>
@@ -587,15 +625,15 @@ export default function Wallet() {
         )}
       </AnimatePresence>
 
-      {/* Buy Modal */}
+      {/* Daily Bonus Modal */}
       <AnimatePresence>
-        {showBuyModal && (
+        {showBonusModal && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            onClick={() => setShowBuyModal(false)}
+            onClick={() => setShowBonusModal(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -605,64 +643,40 @@ export default function Wallet() {
               className="bg-card border border-border rounded-3xl p-6 w-full max-w-sm shadow-2xl"
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-foreground">Купить Spark</h3>
-                <button onClick={() => setShowBuyModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <h3 className="text-lg font-bold text-foreground">Ежедневный бонус</h3>
+                <button onClick={() => setShowBonusModal(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <X size={20} />
                 </button>
               </div>
-              <div className="space-y-3">
-                {[
-                  { label: "Starter", amount: 100, price: "49 ₽", emoji: "⚡" },
-                  { label: "Popular", amount: 500, price: "199 ₽", emoji: "🔥", best: true },
-                  { label: "Premium", amount: 1500, price: "499 ₽", emoji: "💎" },
-                  { label: "Ultra", amount: 5000, price: "1499 ₽", emoji: "🚀" },
-                ].map((pkg) => (
+              <div className="flex flex-col items-center gap-4 py-2">
+                <motion.div
+                  animate={bonusClaimed ? {} : { scale: [1, 1.08, 1] }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                  className="w-24 h-24 rounded-3xl flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg, #22d3ee22, #7c3aed22)", border: "2px solid #7c3aed44" }}
+                >
+                  <span className="text-5xl">⚡</span>
+                </motion.div>
+                <div className="text-center">
+                  <p className="text-3xl font-black text-foreground">+1 000 Spark</p>
+                  <p className="text-sm text-muted-foreground mt-1">Бесплатно каждый день, без покупок</p>
+                </div>
+                {bonusClaimed ? (
+                  <div className="w-full py-3 rounded-xl bg-green-500/15 border border-green-500/30 text-center text-sm font-semibold text-green-400">
+                    Уже получен сегодня — возвращайся завтра!
+                  </div>
+                ) : (
                   <button
-                    key={pkg.amount}
-                    disabled={buyLoading}
-                    onClick={async () => {
-                      setBuyLoading(true);
-                      try {
-                        const res = await fetch("/api/wallet/topup-request", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json", ...getUserIdHeader() },
-                          body: JSON.stringify({ amount: pkg.amount, packageLabel: pkg.label, priceLabel: pkg.price }),
-                        });
-                        const data = await res.json();
-                        setShowBuyModal(false);
-                        if (!res.ok) {
-                          toast({ title: "Ошибка", description: data.error || "Не удалось отправить заявку" });
-                        } else {
-                          toast({ title: "✅ Заявка отправлена", description: `Запрос на ${pkg.amount} ⚡ Spark отправлен администратору. Ожидайте подтверждения.` });
-                        }
-                      } catch {
-                        setShowBuyModal(false);
-                        toast({ title: "Ошибка", description: "Не удалось подключиться к серверу" });
-                      } finally {
-                        setBuyLoading(false);
-                      }
-                    }}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
-                      pkg.best
-                        ? "border-primary/60 bg-primary/10 hover:bg-primary/15"
-                        : "border-border bg-background hover:border-primary/30"
-                    }`}
+                    disabled={bonusLoading}
+                    onClick={handleDailyBonus}
+                    className="w-full py-3 rounded-xl font-bold text-white text-sm transition-all disabled:opacity-60"
+                    style={{ background: "linear-gradient(135deg, #22d3ee, #7c3aed)" }}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{pkg.emoji}</span>
-                      <div className="text-left">
-                        <div className="text-sm font-bold text-foreground flex items-center gap-2">
-                          {pkg.label}
-                          {pkg.best && <span className="text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">Хит</span>}
-                        </div>
-                        <div className="text-xs text-muted-foreground">{pkg.amount} ⚡ Spark</div>
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold text-foreground">{pkg.price}</span>
+                    {bonusLoading ? "Получение..." : "Забрать бонус"}
                   </button>
-                ))}
+                )}
+                <p className="text-xs text-muted-foreground text-center">Новый бонус доступен каждый день в 00:00</p>
               </div>
-              <p className="text-xs text-muted-foreground text-center mt-4">Заявка будет рассмотрена администратором</p>
             </motion.div>
           </motion.div>
         )}
