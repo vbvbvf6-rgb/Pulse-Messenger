@@ -34,33 +34,33 @@ const GIFT_IMAGES: Record<string, string> = {
 
 const RARITY_CONFIG: Record<string, { gradient: string; glow: string; badge: string; label: string }> = {
   cosmic: {
-    gradient: "from-cyan-300 via-violet-500 to-fuchsia-500",
-    glow: "shadow-[0_0_40px_rgba(167,139,250,0.7)] hover:shadow-[0_0_70px_rgba(167,139,250,0.9)]",
-    badge: "bg-violet-500/30 text-violet-200 border-violet-300/60",
+    gradient: "from-rose-300 via-fuchsia-500 to-red-700",
+    glow: "shadow-[0_0_40px_rgba(244,63,94,0.7)] hover:shadow-[0_0_70px_rgba(244,63,94,0.9)]",
+    badge: "bg-fuchsia-500/30 text-fuchsia-200 border-fuchsia-300/60",
     label: "COSMIC",
   },
   legendary: {
-    gradient: "from-yellow-300 via-orange-400 to-red-500",
-    glow: "shadow-[0_0_30px_rgba(251,191,36,0.5)] hover:shadow-[0_0_50px_rgba(251,191,36,0.7)]",
-    badge: "bg-yellow-500/30 text-yellow-300 border-yellow-400/50",
+    gradient: "from-red-300 via-rose-500 to-red-800",
+    glow: "shadow-[0_0_30px_rgba(220,38,38,0.55)] hover:shadow-[0_0_50px_rgba(220,38,38,0.75)]",
+    badge: "bg-red-500/30 text-red-200 border-red-400/50",
     label: "LEGENDARY",
   },
   epic: {
-    gradient: "from-purple-400 via-pink-500 to-purple-700",
-    glow: "shadow-[0_0_20px_rgba(168,85,247,0.4)] hover:shadow-[0_0_35px_rgba(168,85,247,0.6)]",
-    badge: "bg-purple-500/30 text-purple-300 border-purple-400/50",
+    gradient: "from-rose-400 via-red-500 to-rose-800",
+    glow: "shadow-[0_0_20px_rgba(244,63,94,0.4)] hover:shadow-[0_0_35px_rgba(244,63,94,0.6)]",
+    badge: "bg-rose-500/30 text-rose-300 border-rose-400/50",
     label: "EPIC",
   },
   rare: {
-    gradient: "from-blue-400 via-cyan-400 to-teal-500",
-    glow: "shadow-[0_0_12px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.5)]",
-    badge: "bg-blue-500/30 text-blue-300 border-blue-400/50",
+    gradient: "from-pink-400 via-rose-500 to-red-600",
+    glow: "shadow-[0_0_12px_rgba(244,63,94,0.3)] hover:shadow-[0_0_25px_rgba(244,63,94,0.5)]",
+    badge: "bg-pink-500/30 text-pink-300 border-pink-400/50",
     label: "RARE",
   },
   common: {
-    gradient: "from-slate-400 via-slate-500 to-slate-600",
-    glow: "shadow-[0_0_6px_rgba(100,116,139,0.2)] hover:shadow-[0_0_15px_rgba(100,116,139,0.3)]",
-    badge: "bg-slate-500/30 text-slate-300 border-slate-400/50",
+    gradient: "from-rose-300 via-red-400 to-rose-600",
+    glow: "shadow-[0_0_6px_rgba(244,63,94,0.2)] hover:shadow-[0_0_15px_rgba(244,63,94,0.35)]",
+    badge: "bg-rose-500/30 text-rose-300 border-rose-400/50",
     label: "COMMON",
   },
 };
@@ -324,6 +324,19 @@ function GiftVisual({ name, emoji, rarity, animationType, size = 64 }: {
   );
 }
 
+function RosePetalBg() {
+  return (
+    <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.07]" viewBox="0 0 160 160" preserveAspectRatio="xMidYMid slice">
+      <ellipse cx="20" cy="30" rx="28" ry="18" fill="#ef4444" transform="rotate(-30 20 30)" />
+      <ellipse cx="140" cy="25" rx="22" ry="14" fill="#f43f5e" transform="rotate(25 140 25)" />
+      <ellipse cx="10" cy="130" rx="20" ry="13" fill="#dc2626" transform="rotate(15 10 130)" />
+      <ellipse cx="150" cy="140" rx="26" ry="16" fill="#e11d48" transform="rotate(-20 150 140)" />
+      <ellipse cx="80" cy="8" rx="18" ry="11" fill="#f43f5e" transform="rotate(5 80 8)" />
+      <ellipse cx="80" cy="152" rx="22" ry="13" fill="#dc2626" transform="rotate(-10 80 152)" />
+    </svg>
+  );
+}
+
 function GiftCard({ item, onClick, hasPrime }: { item: GiftItem; onClick: () => void; hasPrime: boolean }) {
   const cfg = RARITY_CONFIG[item.rarity] || RARITY_CONFIG.common;
   const theme = getGiftTheme(item.name);
@@ -341,8 +354,20 @@ function GiftCard({ item, onClick, hasPrime }: { item: GiftItem; onClick: () => 
       className={`relative cursor-pointer rounded-2xl overflow-hidden transition-shadow duration-300 ${isLocked ? "opacity-75" : cfg.glow}`}
     >
       <div className={`p-[1.5px] rounded-2xl bg-gradient-to-br ${isPrimeOnly ? "from-amber-400 via-yellow-500 to-orange-500" : cfg.gradient}`}>
-        <div className="bg-[hsl(222,47%,13%)] rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[160px] relative overflow-hidden">
+        <div
+          className="rounded-2xl p-4 flex flex-col items-center justify-center text-center min-h-[160px] relative overflow-hidden"
+          style={{ background: "linear-gradient(145deg, #1f0610 0%, #2d0916 55%, #1a0409 100%)" }}
+        >
+          <RosePetalBg />
           {hovered && item.rarity !== "common" && !isLocked && <FloatingParticles rarity={item.rarity} theme={theme} />}
+          {hovered && (
+            <motion.div
+              className="absolute inset-0 rounded-2xl pointer-events-none"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              style={{ background: "radial-gradient(circle at 50% 40%, rgba(220,38,38,0.18) 0%, transparent 70%)" }}
+            />
+          )}
           <div className="mb-3 relative z-10">
             <GiftVisual
               name={item.name}
@@ -352,9 +377,9 @@ function GiftCard({ item, onClick, hasPrime }: { item: GiftItem; onClick: () => 
               size={64}
             />
           </div>
-          <h3 className="font-bold text-sm mb-1 leading-tight relative z-10">{item.name}</h3>
-          <div className="flex items-center gap-1 text-primary font-medium text-xs relative z-10">
-            <Zap size={11} className="text-primary" />
+          <h3 className="font-bold text-sm mb-1 leading-tight relative z-10 text-rose-50">{item.name}</h3>
+          <div className="flex items-center gap-1 font-medium text-xs relative z-10 text-rose-400">
+            <Zap size={11} className="text-rose-400" />
             <span>{item.stars} Монета</span>
           </div>
           <span className={`absolute top-2 left-2 text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${isPrimeOnly ? "bg-amber-500/30 text-amber-300 border-amber-400/50" : cfg.badge}`}>
@@ -599,12 +624,12 @@ export default function Gifts() {
         )}
       </AnimatePresence>
 
-      <header className="h-16 border-b border-border flex items-center px-6 justify-between bg-card/80 backdrop-blur-md z-10 shrink-0">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <GiftIcon className="text-primary" size={20} /> Подарки
+      <header className="h-16 border-b border-rose-900/40 flex items-center px-6 justify-between z-10 shrink-0" style={{ background: "linear-gradient(135deg, #1a0409 0%, #2d0916 100%)" }}>
+        <h1 className="text-xl font-bold flex items-center gap-2 text-rose-100">
+          <span className="text-2xl">🌹</span> Подарки
         </h1>
-        <div className="flex items-center gap-1.5 text-sm font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
-          <Zap size={14} /> {balance} Монета
+        <div className="flex items-center gap-1.5 text-sm font-bold text-rose-300 bg-rose-500/10 px-3 py-1.5 rounded-full border border-rose-500/30">
+          <Zap size={14} className="text-rose-400" /> {balance} Монета
         </div>
       </header>
 

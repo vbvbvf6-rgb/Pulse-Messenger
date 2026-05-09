@@ -575,7 +575,7 @@ export default function Settings() {
   // Apply font size globally
   useEffect(() => {
     const opt = FONT_SIZE_OPTIONS.find(f => f.value === fontSize);
-    if (opt) document.documentElement.style.setProperty("--app-font-size", opt.size);
+    if (opt) document.documentElement.style.fontSize = opt.size;
   }, [fontSize, lang]);
 
   // Calculate storage size
