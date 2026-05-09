@@ -4,7 +4,7 @@ import {
   Shield, Zap, Users, TrendingUp, Send, CheckCircle, AlertTriangle, RefreshCw,
   Plus, Trash2, Key, BadgeCheck, X, ShieldCheck, ShieldOff, MessageSquare,
   PhoneCall, Gift, Crown, Megaphone, BarChart3, Activity, Star,
-  Edit3, Save, ChevronDown, ChevronRight, Minus, Ban, FileText, Trophy, Image
+  Edit3, Save, ChevronDown, ChevronRight, Minus, Ban, FileText, Trophy, Image, Package
 } from "lucide-react";
 
 const ADMIN_USER_IDS = [4];
@@ -152,6 +152,58 @@ export default function Admin() {
   // Ban
   const [banLoading, setBanLoading] = useState(false);
   const [bannedIds, setBannedIds] = useState<Set<number>>(new Set());
+
+  // Top-up requests
+  interface TopupRequest {
+    id: number;
+    user_id: number;
+    username: string;
+    display_name: string;
+    avatar_color: string;
+    avatar_url: string | null;
+    amount: number;
+    package_label: string;
+    price_label: string;
+    status: string;
+    created_at: string;
+  }
+  const [topupRequests, setTopupRequests] = useState<TopupRequest[]>([]);
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupActionLoading, setTopupActionLoading] = useState<number | null>(null);
+
+  const fetchTopupRequests = async () => {
+    setTopupLoading(true);
+    try {
+      const res = await fetch("/api/admin/topup-requests", { headers: getHeader() });
+      if (res.ok) setTopupRequests(await res.json());
+    } catch {}
+    setTopupLoading(false);
+  };
+
+  const handleTopupApprove = async (id: number) => {
+    setTopupActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/topup-requests/${id}/approve`, { method: "POST", headers: getHeader() });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast(`✅ Одобрено +${data.amount} ⚡ пользователю`, "ok");
+      setTopupRequests(prev => prev.map(r => r.id === id ? { ...r, status: "approved" } : r));
+    } catch { showToast("Ошибка соединения", "err"); }
+    setTopupActionLoading(null);
+  };
+
+  const handleTopupDeny = async (id: number) => {
+    setTopupActionLoading(id);
+    try {
+      const res = await fetch(`/api/admin/topup-requests/${id}/deny`, { method: "POST", headers: getHeader() });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
+      showToast("❌ Заявка отклонена", "ok");
+      setTopupRequests(prev => prev.map(r => r.id === id ? { ...r, status: "denied" } : r));
+    } catch { showToast("Ошибка соединения", "err"); }
+    setTopupActionLoading(null);
+  };
 
   const showToast = (msg: string, type: "ok" | "err") => {
     setToast({ msg, type });
@@ -629,6 +681,87 @@ export default function Admin() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Top-up Requests */}
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <button
+            onClick={() => { setShowTopup(v => !v); if (!showTopup && topupRequests.length === 0) fetchTopupRequests(); }}
+            className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center">
+                <Package size={18} className="text-green-400" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">Заявки на пополнение</p>
+                <p className="text-xs text-muted-foreground">
+                  {topupRequests.filter(r => r.status === "pending").length > 0
+                    ? `${topupRequests.filter(r => r.status === "pending").length} ожидают подтверждения`
+                    : "Одобрить или отклонить заявки"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {topupRequests.filter(r => r.status === "pending").length > 0 && (
+                <span className="w-5 h-5 rounded-full bg-green-500 text-white text-[10px] font-black flex items-center justify-center">
+                  {topupRequests.filter(r => r.status === "pending").length}
+                </span>
+              )}
+              {showTopup ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+            </div>
+          </button>
+          {showTopup && (
+            <div className="border-t border-border">
+              <div className="p-2 border-b border-border flex justify-end">
+                <button onClick={fetchTopupRequests} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary transition-colors">
+                  <RefreshCw size={12} className={topupLoading ? "animate-spin" : ""} /> Обновить
+                </button>
+              </div>
+              {topupLoading ? (
+                <div className="p-6 flex justify-center"><RefreshCw size={20} className="animate-spin text-muted-foreground" /></div>
+              ) : topupRequests.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Заявок нет</div>
+              ) : (
+                <div className="divide-y divide-border max-h-96 overflow-y-auto">
+                  {topupRequests.map(r => (
+                    <div key={r.id} className="p-3 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center text-sm font-bold text-white" style={{ background: r.avatar_color }}>
+                        {r.avatar_url ? <img src={r.avatar_url} className="w-full h-full rounded-full object-cover" /> : r.display_name[0]?.toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">@{r.username}</p>
+                        <p className="text-xs text-muted-foreground">{r.package_label} — {r.amount} ⚡ за {r.price_label}</p>
+                        <p className="text-[10px] text-muted-foreground">{new Date(r.created_at).toLocaleString("ru-RU")}</p>
+                      </div>
+                      {r.status === "pending" ? (
+                        <div className="flex gap-2 shrink-0">
+                          <button
+                            onClick={() => handleTopupApprove(r.id)}
+                            disabled={topupActionLoading === r.id}
+                            className="px-3 py-1.5 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-xs font-bold hover:bg-green-500/20 transition-colors disabled:opacity-50"
+                          >
+                            {topupActionLoading === r.id ? "..." : "✓ Одобрить"}
+                          </button>
+                          <button
+                            onClick={() => handleTopupDeny(r.id)}
+                            disabled={topupActionLoading === r.id}
+                            className="px-3 py-1.5 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs font-bold hover:bg-destructive/20 transition-colors disabled:opacity-50"
+                          >
+                            {topupActionLoading === r.id ? "..." : "✗"}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-xl shrink-0 ${r.status === "approved" ? "bg-green-500/10 text-green-400" : "bg-destructive/10 text-destructive"}`}>
+                          {r.status === "approved" ? "Одобрено" : "Отклонено"}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Posts Moderation + Leaderboard */}

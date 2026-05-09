@@ -343,6 +343,59 @@ router.post("/admin/users/:userId/ban", requireAdmin, async (req, res) => {
   }
 });
 
+router.get("/admin/topup-requests", requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.execute(
+      sql`SELECT tr.id, tr.user_id, tr.amount, tr.package_label, tr.price_label, tr.status, tr.created_at, tr.resolved_at,
+                 u.username, u.display_name, u.avatar_color, u.avatar_url
+          FROM topup_requests tr
+          JOIN users u ON u.id = tr.user_id
+          ORDER BY tr.created_at DESC
+          LIMIT 100`
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.post("/admin/topup-requests/:id/approve", requireAdmin, async (req, res) => {
+  try {
+    const reqId = Number(req.params.id);
+    const rows = await db.execute(
+      sql`SELECT * FROM topup_requests WHERE id = ${reqId} AND status = 'pending'`
+    );
+    const tr = rows.rows[0] as any;
+    if (!tr) return res.status(404).json({ error: "Заявка не найдена или уже обработана" });
+
+    await db.execute(sql`UPDATE users SET balance = balance + ${tr.amount} WHERE id = ${tr.user_id}`);
+    await db.execute(sql`UPDATE topup_requests SET status = 'approved', resolved_at = NOW() WHERE id = ${reqId}`);
+
+    const balRow = await db.execute(sql`SELECT balance FROM users WHERE id = ${tr.user_id}`);
+    const newBalance = Number((balRow.rows[0] as any).balance);
+    res.json({ success: true, userId: tr.user_id, amount: tr.amount, newBalance });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.post("/admin/topup-requests/:id/deny", requireAdmin, async (req, res) => {
+  try {
+    const reqId = Number(req.params.id);
+    const rows = await db.execute(
+      sql`SELECT id FROM topup_requests WHERE id = ${reqId} AND status = 'pending'`
+    );
+    if ((rows.rows as any[]).length === 0) return res.status(404).json({ error: "Заявка не найдена или уже обработана" });
+    await db.execute(sql`UPDATE topup_requests SET status = 'denied', resolved_at = NOW() WHERE id = ${reqId}`);
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 router.get("/admin/check", async (req, res) => {
   try {
     const ok = await isAdminUser(req.currentUserId);

@@ -617,13 +617,25 @@ export default function Wallet() {
                     disabled={buyLoading}
                     onClick={async () => {
                       setBuyLoading(true);
-                      await new Promise(r => setTimeout(r, 800));
-                      setBuyLoading(false);
-                      setShowBuyModal(false);
-                      toast({
-                        title: "Платёжный шлюз недоступен",
-                        description: `Пополнение на ${pkg.amount} ⚡ временно недоступно. Обратитесь к администратору.`,
-                      });
+                      try {
+                        const res = await fetch("/api/wallet/topup-request", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", ...getUserIdHeader() },
+                          body: JSON.stringify({ amount: pkg.amount, packageLabel: pkg.label, priceLabel: pkg.price }),
+                        });
+                        const data = await res.json();
+                        setShowBuyModal(false);
+                        if (!res.ok) {
+                          toast({ title: "Ошибка", description: data.error || "Не удалось отправить заявку" });
+                        } else {
+                          toast({ title: "✅ Заявка отправлена", description: `Запрос на ${pkg.amount} ⚡ Spark отправлен администратору. Ожидайте подтверждения.` });
+                        }
+                      } catch {
+                        setShowBuyModal(false);
+                        toast({ title: "Ошибка", description: "Не удалось подключиться к серверу" });
+                      } finally {
+                        setBuyLoading(false);
+                      }
                     }}
                     className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
                       pkg.best
@@ -645,7 +657,7 @@ export default function Wallet() {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground text-center mt-4">Платёжная система находится в разработке</p>
+              <p className="text-xs text-muted-foreground text-center mt-4">Заявка будет рассмотрена администратором</p>
             </motion.div>
           </motion.div>
         )}
