@@ -50,6 +50,7 @@ const SYSTEM_USERS = [
     username: "deepseek_ai",
     displayName: "DeepSeek AI",
     avatarColor: "#8B5CF6",
+    avatarUrl: "/deepseek-avatar.jpg",
     isBot: true,
     isVerified: true,
     status: "online",
@@ -95,14 +96,16 @@ export async function runSeed() {
     if ((rows.rows as any[]).length === 0) {
       const pwHash = (u as any).password ? hash((u as any).password) : null;
       await db.execute(sql`
-        INSERT INTO users (username, display_name, avatar_color, status, is_bot, is_verified, is_admin, password_hash, balance)
+        INSERT INTO users (username, display_name, avatar_color, avatar_url, status, is_bot, is_verified, is_admin, password_hash, balance)
         VALUES (
-          ${u.username}, ${u.displayName}, ${u.avatarColor}, ${u.status},
+          ${u.username}, ${u.displayName}, ${u.avatarColor}, ${(u as any).avatarUrl ?? null}, ${u.status},
           ${u.isBot ?? false}, ${u.isVerified ?? false}, ${(u as any).isAdmin ?? false},
           ${pwHash}, 0
         )
       `);
       console.log(`[seed] Created user: ${u.username}`);
+    } else if ((u as any).avatarUrl) {
+      await db.execute(sql`UPDATE users SET avatar_url = ${(u as any).avatarUrl} WHERE username = ${u.username}`);
     }
   }
 
