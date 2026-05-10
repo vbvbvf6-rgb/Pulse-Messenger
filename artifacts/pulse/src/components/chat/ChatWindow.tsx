@@ -63,8 +63,8 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data: chat, isLoading: isChatLoading } = useGetChatById(chatId, { query: { enabled: !!chatId } });
-  const { data: messages, isLoading: isMessagesLoading } = useGetMessages({ chatId }, { query: { enabled: !!chatId } });
+  const { data: chat, isLoading: isChatLoading } = useGetChatById(chatId, { query: { enabled: !!chatId } as any });
+  const { data: messages, isLoading: isMessagesLoading } = useGetMessages({ chatId }, { query: { enabled: !!chatId } as any });
   const initiateCall = useInitiateCall();
   const markAsRead = useMarkChatAsRead();
   const updateChat = useUpdateChat();
@@ -237,9 +237,9 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
 
   const getCWAuthHeaders = (json?: boolean): Record<string, string> => {
     const token = localStorage.getItem("pulse-token");
-    const base = token
+    const base: Record<string, string> = token
       ? { "Authorization": `Bearer ${token}` }
-      : (() => { const uid = localStorage.getItem("pulse-user-id"); return uid ? { "x-user-id": uid } : {}; })();
+      : (() => { const uid = localStorage.getItem("pulse-user-id"); return uid ? { "x-user-id": uid } : ({} as Record<string, string>); })();
     return json ? { "Content-Type": "application/json", ...base } : base;
   };
 
@@ -576,6 +576,10 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
         {showInfoPanel && (
           <ChatInfoPanel
             chatId={chatId}
+            chatType={chat.type as "group" | "channel"}
+            displayName={chat.name || ""}
+            avatarUrl={chat.avatarUrl}
+            avatarColor={chat.avatarColor || "#333"}
             onClose={() => setShowInfoPanel(false)}
             onDeleteChat={() => setShowDeleteDialog(true)}
             onSetAutoDelete={() => setShowAutoDeleteMenu(true)}
@@ -588,7 +592,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
         )}
       </AnimatePresence>
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="max-w-sm rounded-[24px]">
           <AlertDialogHeader>
             <div className="w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto mb-4">
@@ -603,7 +607,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-col gap-2 mt-6">
             <AlertDialogAction
-              onClick={handleDeleteConfirm}
+              onClick={handleDeleteChat}
               className="w-full h-14 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold text-[15px] shadow-[0_4px_14px_rgba(220,38,38,0.3)]"
             >
               Удалить навсегда

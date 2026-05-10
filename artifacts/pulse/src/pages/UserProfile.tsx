@@ -69,7 +69,7 @@ export default function UserProfile() {
   const queryClient = useQueryClient();
   const [isStartingChat, setIsStartingChat] = useState(false);
 
-  const { data: user, isLoading } = useGetUserById(userId, { query: { enabled: !!userId } });
+  const { data: user, isLoading } = useGetUserById(userId, { query: { enabled: !!userId } as any });
   const { data: contacts } = useGetContacts();
   const { data: chats } = useGetChats();
   const { data: sentGifts } = useGetSentGifts();

@@ -188,7 +188,7 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
     setIsSending(true);
     try {
       if (audioBlob) {
-        const base64 = await readFileAsDataUrl(audioBlob);
+        const base64 = await readFileAsDataUrl(new File([audioBlob], "voice.webm", { type: audioBlob.type }));
         await sendMessage.mutateAsync({
           data: { chatId, type: "audio", mediaUrl: base64, text: `voice:${recordSeconds}`, replyToId: replyTo?.id }
         });

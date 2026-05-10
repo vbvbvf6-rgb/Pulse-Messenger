@@ -240,7 +240,7 @@ function TwoFaSection({ user, toast, lang }: { user: any; toast: any; lang: stri
 
   useEffect(() => { setEnabled(!!(user as any)?.totpEnabled); }, [user]);
 
-  const getHeaders = () => {
+  const getHeaders = (): Record<string, string> => {
     const token = localStorage.getItem("pulse-token");
     if (token) return { "Authorization": `Bearer ${token}` };
     const uid = localStorage.getItem("pulse-user-id");

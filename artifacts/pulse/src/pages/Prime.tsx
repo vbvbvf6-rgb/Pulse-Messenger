@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Crown, Zap, Check, Star, Shield, MessageCircle, Gift, Image,
-  Infinity, X, AlertTriangle, Palette, RefreshCw, TrendingUp,
+  Infinity as InfinityIcon, X, AlertTriangle, Palette, RefreshCw, TrendingUp,
   ShoppingCart, Bell, Clock, Lock, CalendarClock, RotateCcw, Flame
 } from "lucide-react";
 import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
@@ -103,7 +103,7 @@ const FEATURES = [
     bg: "bg-green-500/10",
   },
   {
-    icon: Infinity,
+    icon: InfinityIcon,
     text: "Хранение истории сообщений навсегда",
     tag: "Визуально",
     color: "text-cyan-400",
@@ -362,7 +362,7 @@ export default function Prime() {
     try {
       const _token = localStorage.getItem("pulse-token");
       const _uid = localStorage.getItem("pulse-user-id");
-      const _auth = _token ? { "Authorization": `Bearer ${_token}` } : _uid ? { "x-user-id": _uid } : {};
+      const _auth: Record<string, string> = _token ? { "Authorization": `Bearer ${_token}` } : _uid ? { "x-user-id": _uid } : {};
       const res = await fetch("/api/prime/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json", ..._auth },

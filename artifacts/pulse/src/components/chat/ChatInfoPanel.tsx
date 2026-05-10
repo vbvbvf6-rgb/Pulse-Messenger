@@ -48,19 +48,26 @@ interface UserResult {
 
 interface ChatInfoPanelProps {
   chatId: number;
-  chatType: "group" | "channel";
-  displayName: string;
+  chatType?: "group" | "channel";
+  displayName?: string;
   avatarUrl?: string | null;
-  avatarColor: string;
+  avatarColor?: string;
   onClose: () => void;
   onNameChanged?: (name: string) => void;
+  onDeleteChat?: () => void;
+  onSetAutoDelete?: () => void;
+  autoDeleteTimer?: number | null;
+  onTogglePin?: () => void;
+  isPinned?: boolean;
+  onToggleMute?: () => void;
+  isMuted?: boolean;
 }
 
 function getAuthHeaders(json?: boolean): Record<string, string> {
   const token = localStorage.getItem("pulse-token");
-  const base = token
+  const base: Record<string, string> = token
     ? { "Authorization": `Bearer ${token}` }
-    : (() => { const uid = localStorage.getItem("pulse-user-id"); return uid ? { "x-user-id": uid } : {}; })();
+    : (() => { const uid = localStorage.getItem("pulse-user-id"); return uid ? { "x-user-id": uid } : ({} as Record<string, string>); })();
   return json ? { "Content-Type": "application/json", ...base } : base;
 }
 
@@ -107,7 +114,7 @@ export function ChatInfoPanel({ chatId, chatType, displayName, avatarUrl, avatar
   };
 
   const handleSaveName = async () => {
-    const trimmed = editName.trim();
+    const trimmed = (editName || "").trim();
     if (!trimmed || trimmed === displayName) return;
     setSaving(true);
     await fetch(`/api/chats/${chatId}`, {
@@ -201,7 +208,7 @@ export function ChatInfoPanel({ chatId, chatType, displayName, avatarUrl, avatar
               ) : chatType === "channel" ? (
                 <Radio size={28} />
               ) : (
-                displayName[0]?.toUpperCase() || "G"
+                (displayName || "G")[0]?.toUpperCase() || "G"
               )}
             </div>
             <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">

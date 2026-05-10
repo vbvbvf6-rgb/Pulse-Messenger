@@ -1,4 +1,5 @@
 import React from "react";
+import type { JSX } from "react";
 
 // Unique prefix per gift to avoid SVG gradient ID collisions when multiple rendered at once
 function pfx(name: string) {

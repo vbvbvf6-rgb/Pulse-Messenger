@@ -311,7 +311,7 @@ ${inline_code}
             const fullPrompt = conversationText
               ? `${conversationText}\nUser: ${body.text}\nAssistant:`
               : body.text;
-            const url = `https://text.pollinations.ai/${encodeURIComponent(fullPrompt)}?model=${model}&system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 99999)}`;
+            const url = `https://text.pollinations.ai/${encodeURIComponent(fullPrompt || "")}?model=${model}&system=${encodeURIComponent(systemPrompt)}&seed=${Math.floor(Math.random() * 99999)}`;
             const r = await fetch(url, { method: "GET" });
             if (!r.ok) return undefined;
             const text = await r.text();
@@ -330,7 +330,7 @@ ${inline_code}
                 },
                 body: JSON.stringify({ model: "deepseek/deepseek-chat-v3-0324:free", messages: chatPayload, max_tokens: 500 }),
               });
-              const data = await r.json();
+              const data = await r.json() as any;
               return data.choices?.[0]?.message?.content as string | undefined;
             });
           }

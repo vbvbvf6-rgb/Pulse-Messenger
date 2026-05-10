@@ -274,7 +274,7 @@ function PostCard({ post, onAppealSubmitted }: { post: Post & { appeal?: any; mo
   };
 
   const { data: comments, refetch: refetchComments } = useGetPostComments(post.id, {
-    query: { enabled: showComments }
+    query: { enabled: showComments } as any
   });
 
   const handleLike = () => {

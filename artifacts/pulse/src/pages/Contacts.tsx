@@ -12,7 +12,7 @@ export default function Contacts() {
   const { data: contacts, isLoading: contactsLoading } = useGetContacts();
   const { data: searchResults, isLoading: searchLoading } = useSearchUsers(
     { q: searchQuery },
-    { query: { enabled: searchQuery.length > 2 } }
+    { query: { enabled: searchQuery.length > 2 } as any }
   );
 
   const addContact = useAddContact();

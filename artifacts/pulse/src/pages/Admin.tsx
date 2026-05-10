@@ -619,7 +619,7 @@ export default function Admin() {
     } catch { showToast("Ошибка", "err"); }
   };
 
-  const handleTogglePrime = async (give: boolean) => {
+  const handleTogglePrime = async (give: boolean, _months?: number) => {
     if (!selectedUser) return;
     setPrimeLoading(true);
     try {

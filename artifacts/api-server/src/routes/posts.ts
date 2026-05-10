@@ -116,7 +116,7 @@ Flag ANY of the following: insults directed at a person or group, name-calling, 
         signal: AbortSignal.timeout(10000),
       });
       if (!r.ok) return null;
-      const data = await r.json();
+      const data = await r.json() as any;
       const raw = data.choices?.[0]?.message?.content || "";
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return null;

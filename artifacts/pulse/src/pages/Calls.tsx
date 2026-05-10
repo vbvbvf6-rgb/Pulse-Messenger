@@ -39,8 +39,8 @@ export default function Calls() {
   const missedCount = calls?.filter(c => c.status === "missed").length ?? 0;
 
   const filteredContacts = contacts?.filter(c =>
-    c.contact?.displayName?.toLowerCase().includes(search.toLowerCase()) ||
-    c.contact?.username?.toLowerCase().includes(search.toLowerCase())
+    c.displayName?.toLowerCase().includes(search.toLowerCase()) ||
+    c.username?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -234,24 +234,24 @@ export default function Calls() {
                 {filteredContacts?.length === 0 ? (
                   <p className="text-center text-sm text-muted-foreground py-8">Контакты не найдены</p>
                 ) : filteredContacts?.map((c) => (
-                  <div key={c.contactId} className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary transition-colors">
+                  <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-secondary transition-colors">
                     <div
                       className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shrink-0 overflow-hidden"
-                      style={{ backgroundColor: c.contact?.avatarColor || "#444" }}
+                      style={{ backgroundColor: (c as any).avatarColor || "#444" }}
                     >
-                      {c.contact?.avatarUrl ? (
-                        <img src={c.contact.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      {(c as any).avatarUrl ? (
+                        <img src={(c as any).avatarUrl} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        (c.contact?.displayName || "?")[0].toUpperCase()
+                        (c.displayName || "?")[0].toUpperCase()
                       )}
                     </div>
-                    <span className="flex-1 text-sm font-medium truncate">{c.contact?.displayName}</span>
+                    <span className="flex-1 text-sm font-medium truncate">{c.displayName}</span>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={async () => {
-                          if (!c.contactId) return;
+                          if (!c.id) return;
                           setShowNewCall(false);
-                          try { await startCall(c.contactId, null, "audio"); }
+                          try { await startCall(c.id, null, "audio"); }
                           catch { toast({ title: "Не удалось начать звонок", variant: "destructive" }); }
                         }}
                         className="w-9 h-9 rounded-full flex items-center justify-center text-primary hover:bg-primary/15 transition-colors"
@@ -261,9 +261,9 @@ export default function Calls() {
                       </button>
                       <button
                         onClick={async () => {
-                          if (!c.contactId) return;
+                          if (!c.id) return;
                           setShowNewCall(false);
-                          try { await startCall(c.contactId, null, "video"); }
+                          try { await startCall(c.id, null, "video"); }
                           catch { toast({ title: "Не удалось начать звонок", variant: "destructive" }); }
                         }}
                         className="w-9 h-9 rounded-full flex items-center justify-center text-blue-400 hover:bg-blue-500/15 transition-colors"
