@@ -40,6 +40,17 @@ interface UserStats {
   callsTotal: number;
 }
 
+interface GiftItem {
+  id: number;
+  name: string;
+  emoji: string;
+  rarity: string;
+  stars: number;
+  price: number;
+  animationType: string;
+  primeOnly: boolean;
+}
+
 interface AdminPost {
   id: number;
   text: string;
@@ -112,7 +123,7 @@ export default function Admin() {
   const [giveLoading, setGiveLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"balance" | "password" | "actions" | "stats">("balance");
+  const [activeTab, setActiveTab] = useState<"balance" | "password" | "actions" | "stats" | "gifts">("balance");
   const [newPassword, setNewPassword] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);
@@ -149,6 +160,14 @@ export default function Admin() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderTab, setLeaderTab] = useState<"byBalance" | "byMessages" | "byGifts">("byBalance");
+
+  // Gifts
+  const [giftItems, setGiftItems] = useState<GiftItem[]>([]);
+  const [giftItemsLoading, setGiftItemsLoading] = useState(false);
+  const [selectedGiftId, setSelectedGiftId] = useState<number | null>(null);
+  const [giftMessage, setGiftMessage] = useState("");
+  const [giftAnonymous, setGiftAnonymous] = useState(false);
+  const [giftLoading, setGiftLoading] = useState(false);
 
   // Ban
   const [banLoading, setBanLoading] = useState(false);
@@ -207,6 +226,40 @@ export default function Admin() {
   const [activeAdminTicket, setActiveAdminTicket] = useState<TicketDetail | null>(null);
   const [ticketReplyText, setTicketReplyText] = useState("");
   const [ticketReplying, setTicketReplying] = useState(false);
+
+  const fetchGiftItems = async () => {
+    setGiftItemsLoading(true);
+    try {
+      const res = await fetch("/api/gifts", { headers: getHeader() });
+      if (res.ok) setGiftItems(await res.json());
+    } catch {}
+    setGiftItemsLoading(false);
+  };
+
+  const handleGiveGift = async () => {
+    if (!selectedUser || !selectedGiftId) return;
+    setGiftLoading(true);
+    try {
+      const res = await fetch("/api/admin/give-gift", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          giftItemId: selectedGiftId,
+          message: giftMessage.trim() || undefined,
+          anonymous: giftAnonymous,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); setGiftLoading(false); return; }
+      showToast(data.message, "ok");
+      setSelectedGiftId(null);
+      setGiftMessage("");
+      setGiftAnonymous(false);
+      if (stats) setStats(prev => prev ? { ...prev, totalGifts: prev.totalGifts + 1 } : null);
+    } catch { showToast("Ошибка соединения", "err"); }
+    setGiftLoading(false);
+  };
 
   const fetchBugs = async () => {
     setBugsLoading(true);
@@ -453,11 +506,17 @@ export default function Admin() {
     setShowEditProfile(false);
     setEditDisplayName(user.display_name);
     setEditBio("");
+    setSelectedGiftId(null);
+    setGiftMessage("");
+    setGiftAnonymous(false);
   };
 
   useEffect(() => {
     if (activeTab === "stats" && selectedUser) {
       fetchUserStats(selectedUser.id);
+    }
+    if (activeTab === "gifts" && giftItems.length === 0) {
+      fetchGiftItems();
     }
   }, [activeTab, selectedUser]);
 
@@ -1501,13 +1560,13 @@ export default function Admin() {
 
                 {/* Tabs */}
                 <div className="flex border-b border-border overflow-x-auto">
-                  {(["balance", "password", "actions", "stats"] as const).map(t => (
+                  {(["balance", "gifts", "actions", "password", "stats"] as const).map(t => (
                     <button
                       key={t}
                       onClick={() => setActiveTab(t)}
                       className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap px-2 ${activeTab === t ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
                     >
-                      {t === "balance" ? "⚡ Баланс" : t === "password" ? "🔐 Пароль" : t === "actions" ? "⚙️ Действия" : "📊 Статистика"}
+                      {t === "balance" ? "⚡ Баланс" : t === "gifts" ? "🎁 Подарок" : t === "password" ? "🔐 Пароль" : t === "actions" ? "⚙️ Действия" : "📊 Статистика"}
                     </button>
                   ))}
                 </div>
@@ -1565,6 +1624,93 @@ export default function Admin() {
                         </motion.button>
                       </div>
                     </>
+                  )}
+
+                  {/* Gifts tab */}
+                  {activeTab === "gifts" && (
+                    <div className="space-y-4">
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Выберите подарок для @{selectedUser.username}</p>
+                      {giftItemsLoading ? (
+                        <div className="grid grid-cols-4 gap-2">
+                          {Array.from({ length: 8 }).map((_, i) => (
+                            <div key={i} className="aspect-square rounded-xl bg-secondary/50 animate-pulse" />
+                          ))}
+                        </div>
+                      ) : giftItems.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-6">Каталог подарков пуст</p>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-2 max-h-60 overflow-y-auto pr-1">
+                          {giftItems.map(gift => {
+                            const rarityColor =
+                              gift.rarity === "legendary" ? "border-amber-500/60 bg-amber-500/10" :
+                              gift.rarity === "epic" ? "border-purple-500/60 bg-purple-500/10" :
+                              gift.rarity === "rare" ? "border-blue-500/60 bg-blue-500/10" :
+                              "border-border bg-secondary/30";
+                            const isSelected = selectedGiftId === gift.id;
+                            return (
+                              <motion.button
+                                key={gift.id}
+                                whileHover={{ scale: 1.06 }}
+                                whileTap={{ scale: 0.94 }}
+                                onClick={() => setSelectedGiftId(isSelected ? null : gift.id)}
+                                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${isSelected ? "border-primary bg-primary/10 ring-2 ring-primary/30" : rarityColor}`}
+                                title={gift.name}
+                              >
+                                <span className="text-2xl leading-none">{gift.emoji}</span>
+                                <span className="text-[9px] text-muted-foreground font-medium truncate w-full text-center leading-tight">{gift.name}</span>
+                                <span className="text-[8px] font-black text-primary">⭐ {gift.stars}</span>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {selectedGiftId && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-3"
+                        >
+                          {(() => {
+                            const g = giftItems.find(x => x.id === selectedGiftId);
+                            return g ? (
+                              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-primary/5 border border-primary/20">
+                                <span className="text-2xl">{g.emoji}</span>
+                                <div>
+                                  <p className="text-sm font-bold">{g.name}</p>
+                                  <p className="text-[10px] text-muted-foreground capitalize">{g.rarity} · ⭐ {g.stars}</p>
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+                          <input
+                            value={giftMessage}
+                            onChange={e => setGiftMessage(e.target.value)}
+                            placeholder="Сопроводительное сообщение (необязательно)..."
+                            className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+                          />
+                          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                            <div
+                              onClick={() => setGiftAnonymous(v => !v)}
+                              className={`w-9 h-5 rounded-full border-2 transition-all relative ${giftAnonymous ? "bg-primary border-primary" : "bg-secondary border-border"}`}
+                            >
+                              <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-all ${giftAnonymous ? "left-4" : "left-0.5"}`} />
+                            </div>
+                            <span className="text-xs text-muted-foreground">Анонимно (скрыть отправителя)</span>
+                          </label>
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={handleGiveGift}
+                            disabled={giftLoading}
+                            className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            <Gift size={16} />
+                            {giftLoading ? "Отправляем..." : `Подарить ${giftItems.find(x => x.id === selectedGiftId)?.emoji || ""} @${selectedUser.username}`}
+                          </motion.button>
+                        </motion.div>
+                      )}
+                    </div>
                   )}
 
                   {/* Password tab */}

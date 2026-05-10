@@ -396,6 +396,48 @@ router.post("/admin/topup-requests/:id/deny", requireAdmin, async (req, res) => 
   }
 });
 
+// ── Give Gift (admin, no balance deduction) ──────────────────────────────────
+
+router.post("/admin/give-gift", requireAdmin, async (req, res) => {
+  try {
+    const adminId = req.currentUserId;
+    const { userId, giftItemId, message, anonymous } = req.body;
+
+    if (!userId || !giftItemId) {
+      return res.status(400).json({ error: "Укажите userId и giftItemId" });
+    }
+
+    const target = await db.execute(sql`SELECT id, username, display_name FROM users WHERE id = ${Number(userId)}`);
+    if ((target.rows as any[]).length === 0) {
+      return res.status(404).json({ error: "Пользователь не найден" });
+    }
+
+    const giftItem = await db.execute(sql`SELECT id, name, emoji FROM gift_items WHERE id = ${Number(giftItemId)}`);
+    if ((giftItem.rows as any[]).length === 0) {
+      return res.status(404).json({ error: "Подарок не найден" });
+    }
+
+    const result = await db.execute(sql`
+      INSERT INTO gifts (gift_item_id, sender_id, receiver_id, message, is_anonymous, created_at)
+      VALUES (${Number(giftItemId)}, ${adminId}, ${Number(userId)}, ${message?.trim() || null}, ${!!anonymous}, NOW())
+      RETURNING id
+    `);
+
+    const giftId = (result.rows[0] as any).id;
+    const item = giftItem.rows[0] as any;
+    const user = target.rows[0] as any;
+
+    res.status(201).json({
+      success: true,
+      giftId,
+      message: `Подарок ${item.emoji} «${item.name}» отправлен @${user.username}`,
+    });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 // ── Moderation Appeals ────────────────────────────────────────────────────────
 
 router.get("/admin/moderation/appeals", requireAdmin, async (req, res) => {
