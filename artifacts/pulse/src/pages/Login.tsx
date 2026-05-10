@@ -33,7 +33,7 @@ export default function Login({ onLogin }: LoginProps) {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: username.trim().replace(/^@/, ""), password }),
       });
       const data = await res.json();
       if (!res.ok) {
