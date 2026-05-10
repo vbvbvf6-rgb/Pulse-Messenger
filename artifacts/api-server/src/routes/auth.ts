@@ -250,12 +250,9 @@ router.post("/auth/2fa/disable", async (req, res) => {
 
 router.post("/auth/register", async (req, res) => {
   try {
-    const { username, displayName, password, ageGroup, birthDate, idDocumentUrl } = req.body;
+    const { username, displayName, password, ageGroup, birthDate } = req.body;
     if (!username || !displayName || !password) {
       return res.status(400).json({ error: "Заполните все поля" });
-    }
-    if (!idDocumentUrl) {
-      return res.status(400).json({ error: "Загрузите фото документа для подтверждения возраста" });
     }
 
     const rawUsername = String(username).trim();
@@ -287,10 +284,9 @@ router.post("/auth/register", async (req, res) => {
     const passwordHash = await bcrypt.hash(rawPass, SALT_ROUNDS);
 
     const rawBirthDate = birthDate ? String(birthDate) : null;
-    const rawIdDocUrl = idDocumentUrl ? String(idDocumentUrl) : null;
     const result = await db.execute(
-      sql`INSERT INTO users (username, display_name, avatar_color, status, password_hash, balance, age_group, birth_date, id_document_url, age_verified)
-          VALUES (${rawUsername}, ${rawDisplay}, ${color}, 'online', ${passwordHash}, 0, ${ageGroup ? String(ageGroup) : null}, ${rawBirthDate}, ${rawIdDocUrl}, false)
+      sql`INSERT INTO users (username, display_name, avatar_color, status, password_hash, balance, age_group, birth_date, age_verified)
+          VALUES (${rawUsername}, ${rawDisplay}, ${color}, 'online', ${passwordHash}, 0, ${ageGroup ? String(ageGroup) : null}, ${rawBirthDate}, false)
           RETURNING id, username, display_name, avatar_color, status, created_at, balance`
     );
     const newUser = result.rows[0] as any;
