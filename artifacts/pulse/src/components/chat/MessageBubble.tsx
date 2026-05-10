@@ -101,9 +101,10 @@ export interface MessageBubbleProps {
   message: Message;
   onReply?: (msg: Message) => void;
   onEdit?: (msg: Message) => void;
+  ownBubbleStyle?: React.CSSProperties;
 }
 
-export function MessageBubble({ message, onReply, onEdit }: MessageBubbleProps) {
+export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle }: MessageBubbleProps) {
   const { currentUserId } = useAppContext();
   const queryClient = useQueryClient();
   const isMine = message.senderId === currentUserId;
@@ -366,9 +367,10 @@ export function MessageBubble({ message, onReply, onEdit }: MessageBubbleProps) 
               className={cn(
                 "relative px-5 py-3.5 rounded-[24px] cursor-pointer transition-transform active:scale-[0.98]",
                 isMine
-                  ? "bubble-mine text-primary-foreground rounded-br-sm"
+                  ? (ownBubbleStyle ? "text-white rounded-br-sm" : "bubble-mine text-primary-foreground rounded-br-sm")
                   : "bg-card text-foreground rounded-bl-sm border border-border shadow-sm"
               )}
+              style={isMine && ownBubbleStyle ? ownBubbleStyle : undefined}
             >
               {!isMine && message.sender && (
                 <p className="text-[12px] font-black mb-1.5 leading-none" style={{ color: message.sender.avatarColor }}>

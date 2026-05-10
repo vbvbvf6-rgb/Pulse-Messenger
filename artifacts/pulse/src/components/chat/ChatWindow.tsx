@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
-import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useInitiateCall, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
+import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useInitiateCall, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, Message, useGetMe } from "@workspace/api-client-react";
 import { useNotifications } from "@/hooks/useNotifications";
-import { Phone, Video, MoreVertical, ArrowLeft, Search, BellOff, Bell, Pin, PinOff, User, Trash2, X, Timer, Flame, ChevronRight, Settings, Crown } from "lucide-react";
+import { Phone, Video, MoreVertical, ArrowLeft, Search, BellOff, Bell, Pin, PinOff, User, Trash2, X, Timer, Flame, ChevronRight, Settings, Crown, Palette, Check, Sparkles, Lock } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatInfoPanel } from "./ChatInfoPanel";
 import { useAppContext } from "@/contexts/AppContext";
@@ -29,6 +29,232 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// ─── Chat themes ─────────────────────────────────────────────────────────────
+
+interface ChatTheme {
+  id: string;
+  name: string;
+  emoji: string;
+  tier: "prime" | "prime_plus";
+  bg: React.CSSProperties;
+  bubble: React.CSSProperties;
+  preview: string;
+}
+
+const CHAT_THEMES: ChatTheme[] = [
+  {
+    id: "sunset", name: "Закат", emoji: "🌅", tier: "prime",
+    bg: { background: "linear-gradient(160deg, #1a0a0a 0%, #2d1008 40%, #1a0d1a 100%)" },
+    bubble: { background: "linear-gradient(135deg, #f97316, #ec4899)", boxShadow: "0 4px 16px rgba(249,115,22,0.35)" },
+    preview: "linear-gradient(135deg, #f97316, #ec4899)",
+  },
+  {
+    id: "ocean", name: "Океан", emoji: "🌊", tier: "prime",
+    bg: { background: "linear-gradient(160deg, #050e1a 0%, #07203a 50%, #060a14 100%)" },
+    bubble: { background: "linear-gradient(135deg, #0ea5e9, #6366f1)", boxShadow: "0 4px 16px rgba(14,165,233,0.35)" },
+    preview: "linear-gradient(135deg, #0ea5e9, #6366f1)",
+  },
+  {
+    id: "forest", name: "Лес", emoji: "🌿", tier: "prime",
+    bg: { background: "linear-gradient(160deg, #060f08 0%, #0a2010 50%, #06100a 100%)" },
+    bubble: { background: "linear-gradient(135deg, #22c55e, #14b8a6)", boxShadow: "0 4px 16px rgba(34,197,94,0.35)" },
+    preview: "linear-gradient(135deg, #22c55e, #14b8a6)",
+  },
+  {
+    id: "sakura", name: "Сакура", emoji: "🌸", tier: "prime",
+    bg: { background: "linear-gradient(160deg, #150a10 0%, #28101c 50%, #12070f 100%)" },
+    bubble: { background: "linear-gradient(135deg, #f43f5e, #ec4899)", boxShadow: "0 4px 16px rgba(244,63,94,0.35)" },
+    preview: "linear-gradient(135deg, #f43f5e, #ec4899)",
+  },
+  {
+    id: "dusk", name: "Сумерки", emoji: "🔮", tier: "prime",
+    bg: { background: "linear-gradient(160deg, #0c0814 0%, #1a0f2e 50%, #0a0612 100%)" },
+    bubble: { background: "linear-gradient(135deg, #8b5cf6, #6366f1)", boxShadow: "0 4px 16px rgba(139,92,246,0.35)" },
+    preview: "linear-gradient(135deg, #8b5cf6, #6366f1)",
+  },
+  {
+    id: "ember", name: "Огонь", emoji: "🔥", tier: "prime",
+    bg: { background: "linear-gradient(160deg, #120503 0%, #251008 50%, #100402 100%)" },
+    bubble: { background: "linear-gradient(135deg, #ef4444, #f97316)", boxShadow: "0 4px 16px rgba(239,68,68,0.35)" },
+    preview: "linear-gradient(135deg, #ef4444, #f97316)",
+  },
+  {
+    id: "arctic", name: "Арктика", emoji: "❄️", tier: "prime",
+    bg: { background: "linear-gradient(160deg, #040c12 0%, #081a28 50%, #04101a 100%)" },
+    bubble: { background: "linear-gradient(135deg, #06b6d4, #3b82f6)", boxShadow: "0 4px 16px rgba(6,182,212,0.35)" },
+    preview: "linear-gradient(135deg, #06b6d4, #3b82f6)",
+  },
+  {
+    id: "gold", name: "Золото", emoji: "✨", tier: "prime",
+    bg: { background: "linear-gradient(160deg, #110d02 0%, #221a04 50%, #0e0a02 100%)" },
+    bubble: { background: "linear-gradient(135deg, #eab308, #f97316)", boxShadow: "0 4px 16px rgba(234,179,8,0.35)" },
+    preview: "linear-gradient(135deg, #eab308, #f97316)",
+  },
+  {
+    id: "galaxy", name: "Галактика", emoji: "🌌", tier: "prime_plus",
+    bg: {
+      background: "linear-gradient(160deg, #08041a 0%, #120a2e 35%, #04100e 70%, #0e0418 100%)",
+      backgroundImage: "radial-gradient(ellipse at 20% 40%, rgba(139,92,246,0.12) 0%, transparent 50%), radial-gradient(ellipse at 80% 60%, rgba(6,182,212,0.08) 0%, transparent 50%)",
+    },
+    bubble: { background: "linear-gradient(135deg, #7c3aed, #06b6d4)", boxShadow: "0 4px 16px rgba(124,58,237,0.4)" },
+    preview: "linear-gradient(135deg, #7c3aed, #06b6d4)",
+  },
+  {
+    id: "neon", name: "Неон", emoji: "💚", tier: "prime_plus",
+    bg: { background: "linear-gradient(160deg, #030a04 0%, #071408 50%, #03100a 100%)" },
+    bubble: { background: "linear-gradient(135deg, #10b981, #84cc16)", boxShadow: "0 4px 20px rgba(16,185,129,0.45)", border: "1px solid rgba(16,185,129,0.3)" },
+    preview: "linear-gradient(135deg, #10b981, #84cc16)",
+  },
+  {
+    id: "rosegold", name: "Розовое золото", emoji: "💎", tier: "prime_plus",
+    bg: { background: "linear-gradient(160deg, #120808 0%, #241010 35%, #180e0e 70%, #0e0808 100%)" },
+    bubble: { background: "linear-gradient(135deg, #f43f5e, #eab308)", boxShadow: "0 4px 16px rgba(244,63,94,0.35)" },
+    preview: "linear-gradient(135deg, #f43f5e, #eab308)",
+  },
+  {
+    id: "aurora", name: "Аврора", emoji: "🌈", tier: "prime_plus",
+    bg: {
+      background: "linear-gradient(160deg, #04080e 0%, #081224 100%)",
+      backgroundImage: "radial-gradient(ellipse at 15% 50%, rgba(16,185,129,0.1) 0%, transparent 45%), radial-gradient(ellipse at 85% 30%, rgba(139,92,246,0.1) 0%, transparent 45%), radial-gradient(ellipse at 50% 80%, rgba(14,165,233,0.08) 0%, transparent 40%)",
+    },
+    bubble: { background: "linear-gradient(135deg, #10b981, #8b5cf6, #0ea5e9)", boxShadow: "0 4px 20px rgba(139,92,246,0.35)" },
+    preview: "linear-gradient(135deg, #10b981, #8b5cf6, #0ea5e9)",
+  },
+];
+
+function ChatThemePicker({
+  chatId, currentThemeId, hasPrime, isPrimePlus,
+  onSelect, onClose,
+}: {
+  chatId: number; currentThemeId: string | null; hasPrime: boolean; isPrimePlus: boolean;
+  onSelect: (id: string | null) => void; onClose: () => void;
+}) {
+  const primeThemes = CHAT_THEMES.filter(t => t.tier === "prime");
+  const plusThemes  = CHAT_THEMES.filter(t => t.tier === "prime_plus");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        onClick={e => e.stopPropagation()}
+        className="bg-card border border-border rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden"
+      >
+        <div className="p-5 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center">
+              <Palette size={18} className="text-purple-400" />
+            </div>
+            <div>
+              <h3 className="font-black text-base">Тема чата</h3>
+              <p className="text-xs text-muted-foreground">Только для вас</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto scrollbar-none">
+          {/* Default */}
+          <button
+            onClick={() => onSelect(null)}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all ${
+              !currentThemeId ? "border-primary bg-primary/10" : "border-border hover:border-border/80 bg-secondary/30"
+            }`}
+          >
+            <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center shrink-0">
+              <span className="text-lg">🎨</span>
+            </div>
+            <span className="font-bold text-sm flex-1 text-left">Стандартная</span>
+            {!currentThemeId && <Check size={16} className="text-primary" />}
+          </button>
+
+          {/* Prime themes */}
+          <div>
+            <div className="flex items-center gap-2 mb-2.5 px-1">
+              <Crown size={13} className="text-yellow-400" />
+              <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Prime</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {primeThemes.map(theme => {
+                const isActive = currentThemeId === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    onClick={() => onSelect(theme.id)}
+                    className={`relative rounded-2xl overflow-hidden border-2 transition-all ${
+                      isActive ? "border-yellow-400 shadow-[0_0_12px_rgba(234,179,8,0.3)]" : "border-border hover:border-yellow-400/50"
+                    }`}
+                  >
+                    <div className="h-16 w-full" style={theme.bg}>
+                      <div className="absolute bottom-2 right-2 w-8 h-5 rounded-lg" style={{ ...theme.bubble }} />
+                      <div className="absolute bottom-2 left-2 w-10 h-5 rounded-lg bg-white/10" />
+                    </div>
+                    <div className="px-2.5 py-2 flex items-center justify-between bg-card/80">
+                      <span className="text-xs font-bold truncate">{theme.emoji} {theme.name}</span>
+                      {isActive && <Check size={12} className="text-yellow-400 shrink-0" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Prime+ themes */}
+          <div>
+            <div className="flex items-center gap-2 mb-2.5 px-1">
+              <Sparkles size={13} className="text-purple-400" />
+              <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Prime+</span>
+              {!isPrimePlus && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/25 ml-auto">Эксклюзив</span>}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {plusThemes.map(theme => {
+                const isActive = currentThemeId === theme.id;
+                const locked = !isPrimePlus;
+                return (
+                  <button
+                    key={theme.id}
+                    onClick={() => !locked && onSelect(theme.id)}
+                    className={`relative rounded-2xl overflow-hidden border-2 transition-all ${
+                      locked ? "opacity-60 cursor-not-allowed border-border" :
+                      isActive ? "border-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.3)]" : "border-border hover:border-purple-400/50"
+                    }`}
+                  >
+                    <div className="h-16 w-full" style={theme.bg}>
+                      <div className="absolute bottom-2 right-2 w-8 h-5 rounded-lg" style={theme.bubble} />
+                      <div className="absolute bottom-2 left-2 w-10 h-5 rounded-lg bg-white/10" />
+                      {locked && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <Lock size={16} className="text-white/80" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-2.5 py-2 flex items-center justify-between bg-card/80">
+                      <span className="text-xs font-bold truncate">{theme.emoji} {theme.name}</span>
+                      {isActive && !locked && <Check size={12} className="text-purple-400 shrink-0" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-border">
+          <button onClick={onClose} className="w-full py-3 rounded-2xl bg-secondary hover:bg-secondary/80 font-bold text-sm transition-colors">
+            Готово
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
 
 interface ChatWindowProps {
   chatId: number;
