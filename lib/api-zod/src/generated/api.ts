@@ -2065,3 +2065,48 @@ export const GetMyStatsResponse = zod.object({
   chatsCount: zod.number(),
   contactsCount: zod.number(),
 });
+
+/**
+ * @summary Get security question for a username (for password reset)
+ */
+export const GetSecurityQuestionQueryParams = zod.object({
+  username: zod.coerce.string(),
+});
+
+export const GetSecurityQuestionResponse = zod.object({
+  question: zod.string(),
+});
+
+/**
+ * @summary Reset password using security question answer
+ */
+export const ResetPasswordBody = zod.object({
+  username: zod.string(),
+  answer: zod.string(),
+  newPassword: zod.string(),
+});
+
+export const ResetPasswordResponse = zod.object({
+  success: zod.boolean(),
+  token: zod.string(),
+});
+
+/**
+ * @summary Set or update the security question for the current user
+ */
+export const SetSecurityQuestionBody = zod.object({
+  question: zod.string(),
+  answer: zod.string(),
+});
+
+export const SetSecurityQuestionResponse = zod.object({
+  success: zod.boolean(),
+});
+
+/**
+ * @summary Check if current user has a security question set
+ */
+export const HasSecurityQuestionResponse = zod.object({
+  hasQuestion: zod.boolean(),
+  question: zod.string().optional(),
+});

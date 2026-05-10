@@ -410,6 +410,21 @@ export interface UserStats {
   contactsCount: number;
 }
 
+export interface SecurityQuestionResponse {
+  question: string;
+}
+
+export interface ResetPasswordBody {
+  username: string;
+  answer: string;
+  newPassword: string;
+}
+
+export interface SetSecurityQuestionBody {
+  question: string;
+  answer: string;
+}
+
 export type SearchUsersParams = {
   q: string;
 };
@@ -418,4 +433,22 @@ export type GetMessagesParams = {
   chatId: number;
   limit?: number;
   before?: number;
+};
+
+export type GetSecurityQuestionParams = {
+  username: string;
+};
+
+export type ResetPassword200 = {
+  success: boolean;
+  token: string;
+};
+
+export type SetSecurityQuestion200 = {
+  success: boolean;
+};
+
+export type HasSecurityQuestion200 = {
+  hasQuestion: boolean;
+  question?: string;
 };

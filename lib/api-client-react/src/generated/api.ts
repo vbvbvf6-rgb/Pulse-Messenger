@@ -29,17 +29,24 @@ import type {
   CreateStoryBody,
   EditMessageBody,
   GetMessagesParams,
+  GetSecurityQuestionParams,
   Gift,
   GiftItem,
+  HasSecurityQuestion200,
   HealthStatus,
   InitiateCallBody,
   Message,
   Post,
   PostComment,
   Reaction,
+  ResetPassword200,
+  ResetPasswordBody,
   SearchUsersParams,
+  SecurityQuestionResponse,
   SendGiftBody,
   SendMessageBody,
+  SetSecurityQuestion200,
+  SetSecurityQuestionBody,
   Story,
   StoryGroup,
   UpdateCallBody,
@@ -3389,6 +3396,356 @@ export function useGetMyStats<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetMyStatsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get security question for a username (for password reset)
+ */
+export const getGetSecurityQuestionUrl = (
+  params: GetSecurityQuestionParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/auth/security-question?${stringifiedParams}`
+    : `/api/auth/security-question`;
+};
+
+export const getSecurityQuestion = async (
+  params: GetSecurityQuestionParams,
+  options?: RequestInit,
+): Promise<SecurityQuestionResponse> => {
+  return customFetch<SecurityQuestionResponse>(
+    getGetSecurityQuestionUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetSecurityQuestionQueryKey = (
+  params?: GetSecurityQuestionParams,
+) => {
+  return [`/api/auth/security-question`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetSecurityQuestionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSecurityQuestion>>,
+  TError = ErrorType<void>,
+>(
+  params: GetSecurityQuestionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSecurityQuestion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetSecurityQuestionQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSecurityQuestion>>
+  > = ({ signal }) =>
+    getSecurityQuestion(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSecurityQuestion>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetSecurityQuestionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSecurityQuestion>>
+>;
+export type GetSecurityQuestionQueryError = ErrorType<void>;
+
+/**
+ * @summary Get security question for a username (for password reset)
+ */
+
+export function useGetSecurityQuestion<
+  TData = Awaited<ReturnType<typeof getSecurityQuestion>>,
+  TError = ErrorType<void>,
+>(
+  params: GetSecurityQuestionParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSecurityQuestion>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSecurityQuestionQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Reset password using security question answer
+ */
+export const getResetPasswordUrl = () => {
+  return `/api/auth/reset-password`;
+};
+
+export const resetPassword = async (
+  resetPasswordBody: ResetPasswordBody,
+  options?: RequestInit,
+): Promise<ResetPassword200> => {
+  return customFetch<ResetPassword200>(getResetPasswordUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(resetPasswordBody),
+  });
+};
+
+export const getResetPasswordMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetPassword>>,
+    TError,
+    { data: BodyType<ResetPasswordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resetPassword>>,
+  TError,
+  { data: BodyType<ResetPasswordBody> },
+  TContext
+> => {
+  const mutationKey = ["resetPassword"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resetPassword>>,
+    { data: BodyType<ResetPasswordBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return resetPassword(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResetPasswordMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resetPassword>>
+>;
+export type ResetPasswordMutationBody = BodyType<ResetPasswordBody>;
+export type ResetPasswordMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Reset password using security question answer
+ */
+export const useResetPassword = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetPassword>>,
+    TError,
+    { data: BodyType<ResetPasswordBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resetPassword>>,
+  TError,
+  { data: BodyType<ResetPasswordBody> },
+  TContext
+> => {
+  return useMutation(getResetPasswordMutationOptions(options));
+};
+
+/**
+ * @summary Set or update the security question for the current user
+ */
+export const getSetSecurityQuestionUrl = () => {
+  return `/api/users/me/security-question`;
+};
+
+export const setSecurityQuestion = async (
+  setSecurityQuestionBody: SetSecurityQuestionBody,
+  options?: RequestInit,
+): Promise<SetSecurityQuestion200> => {
+  return customFetch<SetSecurityQuestion200>(getSetSecurityQuestionUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(setSecurityQuestionBody),
+  });
+};
+
+export const getSetSecurityQuestionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setSecurityQuestion>>,
+    TError,
+    { data: BodyType<SetSecurityQuestionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setSecurityQuestion>>,
+  TError,
+  { data: BodyType<SetSecurityQuestionBody> },
+  TContext
+> => {
+  const mutationKey = ["setSecurityQuestion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setSecurityQuestion>>,
+    { data: BodyType<SetSecurityQuestionBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return setSecurityQuestion(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetSecurityQuestionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setSecurityQuestion>>
+>;
+export type SetSecurityQuestionMutationBody = BodyType<SetSecurityQuestionBody>;
+export type SetSecurityQuestionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Set or update the security question for the current user
+ */
+export const useSetSecurityQuestion = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setSecurityQuestion>>,
+    TError,
+    { data: BodyType<SetSecurityQuestionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setSecurityQuestion>>,
+  TError,
+  { data: BodyType<SetSecurityQuestionBody> },
+  TContext
+> => {
+  return useMutation(getSetSecurityQuestionMutationOptions(options));
+};
+
+/**
+ * @summary Check if current user has a security question set
+ */
+export const getHasSecurityQuestionUrl = () => {
+  return `/api/users/me/security-question/check`;
+};
+
+export const hasSecurityQuestion = async (
+  options?: RequestInit,
+): Promise<HasSecurityQuestion200> => {
+  return customFetch<HasSecurityQuestion200>(getHasSecurityQuestionUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getHasSecurityQuestionQueryKey = () => {
+  return [`/api/users/me/security-question/check`] as const;
+};
+
+export const getHasSecurityQuestionQueryOptions = <
+  TData = Awaited<ReturnType<typeof hasSecurityQuestion>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof hasSecurityQuestion>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getHasSecurityQuestionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof hasSecurityQuestion>>
+  > = ({ signal }) => hasSecurityQuestion({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof hasSecurityQuestion>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type HasSecurityQuestionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof hasSecurityQuestion>>
+>;
+export type HasSecurityQuestionQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Check if current user has a security question set
+ */
+
+export function useHasSecurityQuestion<
+  TData = Awaited<ReturnType<typeof hasSecurityQuestion>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof hasSecurityQuestion>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getHasSecurityQuestionQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

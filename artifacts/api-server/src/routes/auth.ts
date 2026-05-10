@@ -360,4 +360,97 @@ router.post("/auth/change-password", async (req, res) => {
   }
 });
 
+router.get("/auth/security-question", async (req, res) => {
+  try {
+    const username = String(req.query.username || "").trim().replace(/^@/, "");
+    if (!username) return res.status(400).json({ error: "Укажите никнейм" });
+
+    const rows = await db.execute(
+      sql`SELECT security_question FROM users WHERE lower(username) = lower(${username}) LIMIT 1`
+    );
+    const user = rows.rows[0] as any;
+    if (!user || !user.security_question) {
+      return res.status(404).json({ error: "Контрольный вопрос не установлен для этого аккаунта" });
+    }
+    res.json({ question: user.security_question });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.post("/auth/reset-password", async (req, res) => {
+  try {
+    const { username, answer, newPassword } = req.body;
+    if (!username || !answer || !newPassword) {
+      return res.status(400).json({ error: "Все поля обязательны" });
+    }
+    if (String(newPassword).length < 6 || String(newPassword).length > 200) {
+      return res.status(400).json({ error: "Новый пароль — минимум 6 символов" });
+    }
+
+    const rows = await db.execute(
+      sql`SELECT id, security_question, security_answer FROM users WHERE lower(username) = lower(${String(username).replace(/^@/, "")}) LIMIT 1`
+    );
+    const user = rows.rows[0] as any;
+    if (!user || !user.security_answer) {
+      return res.status(404).json({ error: "Аккаунт не найден или контрольный вопрос не установлен" });
+    }
+
+    const valid = await bcrypt.compare(String(answer).toLowerCase().trim(), user.security_answer);
+    if (!valid) {
+      return res.status(401).json({ error: "Неверный ответ на контрольный вопрос" });
+    }
+
+    const newHash = await bcrypt.hash(String(newPassword), SALT_ROUNDS);
+    await db.execute(sql`UPDATE users SET password_hash = ${newHash} WHERE id = ${user.id}`);
+
+    const newToken = signToken(user.id);
+    res.json({ success: true, token: newToken });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.put("/users/me/security-question", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const { question, answer } = req.body;
+    if (!question || !answer) {
+      return res.status(400).json({ error: "Укажите вопрос и ответ" });
+    }
+    if (String(question).length > 200) {
+      return res.status(400).json({ error: "Вопрос слишком длинный" });
+    }
+    if (String(answer).trim().length < 2 || String(answer).length > 200) {
+      return res.status(400).json({ error: "Ответ должен быть от 2 до 200 символов" });
+    }
+
+    const answerHash = await bcrypt.hash(String(answer).toLowerCase().trim(), SALT_ROUNDS);
+    await db.execute(
+      sql`UPDATE users SET security_question = ${String(question)}, security_answer = ${answerHash} WHERE id = ${uid}`
+    );
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+router.get("/users/me/security-question/check", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const rows = await db.execute(
+      sql`SELECT security_question FROM users WHERE id = ${uid} LIMIT 1`
+    );
+    const user = rows.rows[0] as any;
+    if (!user) return res.status(404).json({ error: "Пользователь не найден" });
+    res.json({ hasQuestion: !!user.security_question, question: user.security_question || null });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 export default router;

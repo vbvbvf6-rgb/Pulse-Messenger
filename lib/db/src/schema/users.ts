@@ -27,6 +27,8 @@ export const usersTable = pgTable("users", {
   idDocumentUrl: text("id_document_url"),
   totpSecret: text("totp_secret"),
   totpEnabled: boolean("totp_enabled").notNull().default(false),
+  securityQuestion: text("security_question"),
+  securityAnswer: text("security_answer"),
   showOnlineStatus: boolean("show_online_status").notNull().default(true),
   readReceiptsEnabled: boolean("read_receipts_enabled").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

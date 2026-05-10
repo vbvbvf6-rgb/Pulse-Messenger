@@ -760,6 +760,94 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserStats"
 
+  /auth/security-question:
+    get:
+      operationId: getSecurityQuestion
+      tags: [auth]
+      summary: Get security question for a username (for password reset)
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Security question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecurityQuestionResponse"
+        "404":
+          description: Not found or question not set
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Reset password using security question answer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordBody"
+      responses:
+        "200":
+          description: Password reset success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  token:
+                    type: string
+                required: [success, token]
+
+  /users/me/security-question:
+    put:
+      operationId: setSecurityQuestion
+      tags: [users]
+      summary: Set or update the security question for the current user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetSecurityQuestionBody"
+      responses:
+        "200":
+          description: Security question set
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required: [success]
+
+  /users/me/security-question/check:
+    get:
+      operationId: hasSecurityQuestion
+      tags: [users]
+      summary: Check if current user has a security question set
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasQuestion:
+                    type: boolean
+                  question:
+                    type: string
+                required: [hasQuestion]
+
 components:
   schemas:
     HealthStatus:
@@ -1389,3 +1477,30 @@ components:
         - giftsReceived
         - chatsCount
         - contactsCount
+
+    SecurityQuestionResponse:
+      type: object
+      properties:
+        question:
+          type: string
+      required: [question]
+
+    ResetPasswordBody:
+      type: object
+      properties:
+        username:
+          type: string
+        answer:
+          type: string
+        newPassword:
+          type: string
+      required: [username, answer, newPassword]
+
+    SetSecurityQuestionBody:
+      type: object
+      properties:
+        question:
+          type: string
+        answer:
+          type: string
+      required: [question, answer]
