@@ -226,9 +226,11 @@ export interface MessageBubbleProps {
   onEdit?: (msg: Message) => void;
   ownBubbleStyle?: React.CSSProperties;
   onPin?: (msg: Message) => void;
+  typingOut?: boolean;
+  onTypingDone?: () => void;
 }
 
-export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin }: MessageBubbleProps) {
+export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin, typingOut, onTypingDone }: MessageBubbleProps) {
   const { currentUserId } = useAppContext();
   const queryClient = useQueryClient();
   const isMine = message.senderId === currentUserId;
@@ -242,6 +244,28 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin 
   const [showTranslation, setShowTranslation] = useState(false);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
+
+  const [displayedWords, setDisplayedWords] = useState<number>(typingOut ? 0 : Infinity);
+  const typingDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (!typingOut || message.type !== "text" || !message.text) return;
+    const words = message.text.split(" ");
+    setDisplayedWords(0);
+    typingDoneRef.current = false;
+    let idx = 0;
+    const WORD_DELAY = Math.max(18, Math.min(45, 2400 / words.length));
+    const timer = setInterval(() => {
+      idx++;
+      setDisplayedWords(idx);
+      if (idx >= words.length) {
+        clearInterval(timer);
+        typingDoneRef.current = true;
+        onTypingDone?.();
+      }
+    }, WORD_DELAY);
+    return () => clearInterval(timer);
+  }, [typingOut, message.id]);
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = sessionStorage.getItem("pulse-token");
@@ -468,10 +492,20 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin 
     switch (message.type) {
       case "poll":
         return <PollDisplay pollData={pollData} messageId={message.id} chatId={message.chatId} currentUserId={currentUserId} isMine={isMine} />;
-      case "text":
+      case "text": {
+        const words = message.text?.split(" ") ?? [];
+        const isAnimating = typingOut && displayedWords < words.length;
+        const visibleText = typingOut && displayedWords !== Infinity
+          ? words.slice(0, displayedWords).join(" ")
+          : (message.text ?? "");
         return (
           <div>
-            <p className="text-[15px] whitespace-pre-wrap break-words leading-snug font-medium">{message.text}</p>
+            <p className="text-[15px] whitespace-pre-wrap break-words leading-snug font-medium">
+              {visibleText}
+              {isAnimating && (
+                <span className="inline-block w-[2px] h-[14px] ml-[2px] mb-[-2px] align-middle rounded-sm animate-pulse" style={{ background: isMine ? "rgba(255,255,255,0.7)" : "currentColor", opacity: 0.7 }} />
+              )}
+            </p>
             <AnimatePresence>
               {showTranslation && translation && (
                 <motion.div
@@ -495,6 +529,7 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin 
             )}
           </div>
         );
+      }
       case "image":
         return (
           <div className="rounded-xl overflow-hidden -mx-1 -mt-1 mb-1">

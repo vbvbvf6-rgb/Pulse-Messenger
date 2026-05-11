@@ -312,9 +312,11 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const [smartReplyPending, setSmartReplyPending] = useState(false);
   const [pinnedMsgDismissed, setPinnedMsgDismissed] = useState<number | null>(null);
   const [replyChipText, setReplyChipText] = useState<string | null>(null);
+  const [typingOutMsgId, setTypingOutMsgId] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageCountRef = useRef<number>(0);
   const sseRef = useRef<EventSource | null>(null);
+  const prevBotTypingRef = useRef(false);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -486,6 +488,10 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
       setBotTyping(false);
       setTypingForChat(chatId, []);
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      const lastMsg = messages?.[messages.length - 1];
+      if (lastMsg && lastMsg.senderId !== currentUserId && lastMsg.type === "text") {
+        setTypingOutMsgId(lastMsg.id);
+      }
     }
   }, [messages, botTyping]);
 
@@ -935,6 +941,8 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
                 onReply={(msg) => { setEditMessage(null); setReplyTo(msg); }}
                 onEdit={(msg) => { setReplyTo(null); setEditMessage(msg); }}
                 onPin={handlePinMessage}
+                typingOut={message.id === typingOutMsgId}
+                onTypingDone={() => setTypingOutMsgId(null)}
               />
             ))}
           </div>
