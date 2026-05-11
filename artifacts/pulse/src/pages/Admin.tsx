@@ -2171,7 +2171,7 @@ export default function Admin() {
                                     <AdminGiftThumb name={gift.name} emoji={gift.emoji} size={40} />
                                   </div>
                                   <span className="text-[9px] text-foreground/80 font-semibold truncate w-full text-center leading-tight">{gift.name}</span>
-                                  <span className="text-[8px] font-black text-yellow-400">⭐ {gift.stars}</span>
+                                  <span className="text-[8px] font-black text-yellow-400">⚡ {gift.price}</span>
                                   {isSelected && (
                                     <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
                                       <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l1.8 1.8L6.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>

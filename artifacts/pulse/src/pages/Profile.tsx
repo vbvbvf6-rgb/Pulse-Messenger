@@ -3,7 +3,7 @@ import { useGetMyStats, useGetMe } from "@workspace/api-client-react";
 import { GiftShowcase } from "@/components/GiftShowcase";
 import { GiftLeaderboard } from "@/components/GiftLeaderboard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageSquare, Phone, Gift, Users, Clock, CalendarDays, Settings, BadgeCheck, Crown } from "lucide-react";
+import { MessageSquare, Phone, Gift, Users, Clock, CalendarDays, Settings, BadgeCheck, Crown, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -124,7 +124,7 @@ export default function Profile() {
                   </svg>
                 )}
                 {(user as any)?.hasPrime && (
-                  <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">Prime ⭐</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">Prime</span>
                 )}
               </div>
               <p className="text-primary font-medium mb-1 relative z-10">@{user?.username}</p>
@@ -192,6 +192,12 @@ export default function Profile() {
                     label="Contacts" 
                     value={stats?.contactsCount?.toLocaleString() || "0"} 
                     color="bg-primary/10 border-primary/20" 
+                  />
+                  <StatCard 
+                    icon={<Zap className="text-yellow-400" />} 
+                    label="Популярность" 
+                    value={(user as any)?.popularity ? `${Number((user as any).popularity).toLocaleString()} ⚡` : "0 ⚡"} 
+                    color="bg-yellow-500/10 border-yellow-500/20" 
                   />
                 </div>
               )}

@@ -367,8 +367,8 @@ function GiftHoverPreview({ item, anchorRef, visible }: {
             {/* Price row */}
             <div className="flex items-center gap-1.5 bg-white/8 border border-white/10 px-3 py-1 rounded-full mt-0.5">
               <Zap size={11} className="text-yellow-400" />
-              <span className="text-[12px] font-black text-yellow-400">{item.stars.toLocaleString()}</span>
-              <span className="text-[10px] text-white/40">⭐</span>
+              <span className="text-[12px] font-black text-yellow-400">{(item as any).price?.toLocaleString() ?? item.stars.toLocaleString()}</span>
+              <span className="text-[10px] text-white/40">⚡</span>
             </div>
 
             {/* Tap hint */}
@@ -453,12 +453,12 @@ function GiftCard({ item, onClick, hasPrime }: { item: GiftItem; onClick: () => 
         }}
       />
 
-      {/* Bottom name + stars */}
+      {/* Bottom name + price */}
       <div className="relative z-10 w-full px-2 pb-2.5 pt-1 text-center">
         <p className={`text-[11px] font-bold leading-tight truncate ${cfg.textColor}`}>{item.name}</p>
         <div className="flex items-center justify-center gap-0.5 mt-0.5">
-          <span className="text-[10px]">⭐</span>
-          <span className="text-[10px] text-yellow-400 font-black">{item.stars}</span>
+          <span className="text-[10px]">⚡</span>
+          <span className="text-[10px] text-yellow-400 font-black">{(item as any).price ?? item.stars}</span>
         </div>
       </div>
 
@@ -843,7 +843,7 @@ export default function Gifts() {
                         {gift.message && <p className="text-xs mt-0.5 italic opacity-70">&quot;{gift.message}&quot;</p>}
                         <p className="text-xs text-muted-foreground mt-0.5">{formatDistanceToNow(new Date(gift.createdAt), { addSuffix: true })}</p>
                       </div>
-                      <div className="flex items-center gap-0.5 text-yellow-400 text-sm font-bold shrink-0"><span>⭐</span>{gift.giftItem?.stars}</div>
+                      <div className="flex items-center gap-0.5 text-yellow-400 text-sm font-bold shrink-0"><span>⚡</span>{(gift.giftItem as any)?.price ?? gift.giftItem?.stars}</div>
                     </motion.div>
                   );
                 })}
@@ -876,7 +876,7 @@ export default function Gifts() {
                         {gift.message && <p className="text-xs mt-0.5 italic opacity-70">&quot;{gift.message}&quot;</p>}
                         <p className="text-xs text-muted-foreground mt-0.5">{formatDistanceToNow(new Date(gift.createdAt), { addSuffix: true })}</p>
                       </div>
-                      <div className="flex items-center gap-0.5 text-yellow-400 text-sm font-bold shrink-0"><span>⭐</span>{gift.giftItem?.stars}</div>
+                      <div className="flex items-center gap-0.5 text-yellow-400 text-sm font-bold shrink-0"><span>⚡</span>{(gift.giftItem as any)?.price ?? gift.giftItem?.stars}</div>
                     </motion.div>
                   );
                 })}

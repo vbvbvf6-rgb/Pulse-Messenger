@@ -18,7 +18,14 @@ router.get("/users/me", async (req, res) => {
     const ageVerified = row?.age_verified === true || row?.age_verified === "t" || row?.age_verified === 1;
     const isAdmin = row?.is_admin === true || row?.is_admin === "t" || row?.is_admin === 1;
     const isBot = row?.is_bot === true || row?.is_bot === "t" || row?.is_bot === 1;
-    res.json({ ...user, balance, hasPrime, primeTier, primeExpiresAt: row?.prime_expires_at ?? null, usernameChangedAt: row?.username_changed_at ?? null, ageVerified, isAdmin, isBot });
+    const popularityRow = await db.execute(sql`
+      SELECT COALESCE(SUM(gi.price), 0)::int AS popularity
+      FROM gifts g
+      JOIN gift_items gi ON gi.id = g.gift_item_id
+      WHERE g.receiver_id = ${uid} AND g.is_anonymous = false
+    `);
+    const popularity = Number((popularityRow.rows[0] as any)?.popularity || 0);
+    res.json({ ...user, balance, hasPrime, primeTier, primeExpiresAt: row?.prime_expires_at ?? null, usernameChangedAt: row?.username_changed_at ?? null, ageVerified, isAdmin, isBot, popularity });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -122,10 +129,17 @@ router.get("/users/:userId", async (req, res) => {
     const userId = Number(req.params.userId);
     const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
     if (!user) return res.status(404).json({ error: "User not found" });
+    const popularityRow = await db.execute(sql`
+      SELECT COALESCE(SUM(gi.price), 0)::int AS popularity
+      FROM gifts g
+      JOIN gift_items gi ON gi.id = g.gift_item_id
+      WHERE g.receiver_id = ${userId} AND g.is_anonymous = false
+    `);
+    const popularity = Number((popularityRow.rows[0] as any)?.popularity || 0);
     if (userId !== requesterId && !(user as any).showOnlineStatus) {
-      return res.json({ ...user, status: "offline", lastSeen: null });
+      return res.json({ ...user, status: "offline", lastSeen: null, popularity });
     }
-    res.json(user);
+    res.json({ ...user, popularity });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

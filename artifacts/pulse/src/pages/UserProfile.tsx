@@ -356,7 +356,7 @@ export default function UserProfile() {
                     </svg>
                   )}
                   {(user as any).hasPrime && (
-                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">Prime ⭐</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">Prime</span>
                   )}
                   {isContact && (
                     <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">Контакт</span>
@@ -383,6 +383,9 @@ export default function UserProfile() {
             <InfoRow label="Никнейм" value={`@${user.username}`} />
             {user.phoneNumber && <InfoRow label="Телефон" value={user.phoneNumber} />}
             {!isMe && <InfoRow label="Статус" value={statusCfg.label} />}
+            {((user as any).popularity ?? 0) > 0 && (
+              <InfoRow label="⚡ Популярность" value={`${(user as any).popularity.toLocaleString()} Spark`} />
+            )}
           </motion.div>
 
           {!isMe && (commonChats.length > 0 || giftsToUser.length > 0 || giftsFromUser.length > 0) && (

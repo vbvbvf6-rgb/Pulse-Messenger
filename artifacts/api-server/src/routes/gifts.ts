@@ -73,7 +73,7 @@ router.get("/gifts/top-senders/:userId", async (req, res) => {
       WHERE g.receiver_id = ${targetId}
         AND g.is_anonymous = false
       GROUP BY g.sender_id, u.username, u.display_name, u.avatar_color, u.has_prime, u.prime_tier
-      ORDER BY "giftCount" DESC, "totalStars" DESC
+      ORDER BY "totalValue" DESC, "giftCount" DESC
       LIMIT 10
     `);
 

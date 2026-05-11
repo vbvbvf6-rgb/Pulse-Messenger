@@ -157,7 +157,7 @@ router.post("/admin/give-prime", requireAdmin, async (req, res) => {
       const m = Number(months) || 1;
       const expiresAt = new Date();
       expiresAt.setMonth(expiresAt.getMonth() + m);
-      await db.execute(sql`UPDATE users SET has_prime = true, prime_expires_at = ${expiresAt.toISOString()} WHERE id = ${Number(userId)}`);
+      await db.execute(sql`UPDATE users SET has_prime = true, prime_tier = 'prime', prime_expires_at = ${expiresAt.toISOString()} WHERE id = ${Number(userId)}`);
       res.json({ success: true, hasPrime: true, primeExpiresAt: expiresAt.toISOString(), message: `Prime выдан @${target.username} на ${m} мес.` });
     }
   } catch (err) {

@@ -645,7 +645,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
             <div className="flex items-center gap-1.5">
               <h2 className="font-bold text-base leading-tight truncate group-hover:text-primary transition-colors">{displayName}</h2>
               {otherUserHasPrime && (
-                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 shrink-0">⭐</span>
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 shrink-0">Prime</span>
               )}
               {isVerified && (
                 <svg className="shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none">
