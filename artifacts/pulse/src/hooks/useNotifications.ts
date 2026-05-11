@@ -2,6 +2,64 @@ import { useState, useCallback, useEffect } from "react";
 
 export type NotificationPermission = "default" | "granted" | "denied";
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("pulse-token");
+  if (token) return { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+  const uid = localStorage.getItem("pulse-user-id");
+  return uid ? { "x-user-id": uid, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+}
+
+async function registerPushSubscription(): Promise<void> {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const keyRes = await fetch("/api/push/vapid-public-key");
+    if (!keyRes.ok) return;
+    const { key } = await keyRes.json();
+    if (!key) return;
+
+    let subscription = await reg.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      });
+    }
+
+    const { endpoint, keys } = subscription.toJSON() as any;
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ endpoint, keys }),
+    });
+  } catch (err) {
+    console.warn("[push] registration failed", err);
+  }
+}
+
+async function unregisterPushSubscription(): Promise<void> {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const subscription = await reg.pushManager.getSubscription();
+    if (!subscription) return;
+    const endpoint = subscription.endpoint;
+    await subscription.unsubscribe();
+    await fetch("/api/push/subscribe", {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ endpoint }),
+    });
+  } catch {}
+}
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
 export function useNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>(
     typeof Notification !== "undefined" ? Notification.permission : "denied"
@@ -17,6 +75,9 @@ export function useNotifications() {
     if (Notification.permission === "denied") return "denied";
     const result = await Notification.requestPermission();
     setPermission(result);
+    if (result === "granted") {
+      await registerPushSubscription();
+    }
     return result;
   }, []);
 
@@ -61,5 +122,5 @@ export function useNotifications() {
 
   const isSupported = typeof Notification !== "undefined";
 
-  return { permission, requestPermission, notify, isSupported };
+  return { permission, requestPermission, notify, isSupported, registerPushSubscription, unregisterPushSubscription };
 }

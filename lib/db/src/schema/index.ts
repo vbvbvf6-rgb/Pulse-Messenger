@@ -9,3 +9,4 @@ export * from "./posts";
 export * from "./daily_bonus";
 export * from "./support";
 export * from "./bots";
+export * from "./push_subscriptions";

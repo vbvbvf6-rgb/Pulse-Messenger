@@ -3,6 +3,7 @@ import { db, messagesTable, reactionsTable, usersTable, chatMembersTable, chatsT
 import { eq, and, lt, desc, sql, lte } from "drizzle-orm";
 import { spawn } from "node:child_process";
 import { broadcastToChat, broadcastToUser } from "../lib/sse";
+import { sendPushToUser } from "./push";
 import { SendMessageBody, EditMessageBody, AddReactionBody } from "@workspace/api-zod";
 
 async function isAdmin(userId: number): Promise<boolean> {
@@ -184,6 +185,12 @@ router.post("/messages", async (req, res) => {
             chatId: body.chatId,
             senderName,
             body: msgBody,
+          });
+          sendPushToUser(member.id, {
+            title: senderName,
+            body: msgBody,
+            url: "/",
+            tag: `chat-${body.chatId}`,
           });
         }
       } catch {}

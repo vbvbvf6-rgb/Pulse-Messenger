@@ -88,17 +88,22 @@ function MainApp({ onLogout, onSwitchAccount, onRemoveAccount, onOpenAddAccount 
 }
 
 function GlobalNotificationListener() {
-  const { notify, requestPermission } = useNotifications();
+  const { notify, requestPermission, registerPushSubscription } = useNotifications();
   const sseRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    // Request permission on first mount
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      requestPermission();
-    }
-
     const uid = localStorage.getItem("pulse-user-id");
     if (!uid) return;
+
+    // Request permission + register push on first visit
+    if (typeof Notification !== "undefined") {
+      if (Notification.permission === "default") {
+        requestPermission();
+      } else if (Notification.permission === "granted") {
+        registerPushSubscription();
+      }
+    }
+
     const token = localStorage.getItem("pulse-token");
     const es = new EventSource(`/api/users/me/events${token ? `?token=${token}` : `?_uid=${uid}`}`);
     sseRef.current = es;

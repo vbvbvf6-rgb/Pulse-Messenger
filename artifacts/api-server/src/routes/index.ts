@@ -16,6 +16,7 @@ import walletRouter from "./wallet";
 import botsRouter from "./bots";
 import supportRouter from "./support";
 import primeRouter from "./prime";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(walletRouter);
 router.use(botsRouter);
 router.use(supportRouter);
 router.use(primeRouter);
+router.use(pushRouter);
 
 export default router;
