@@ -1,8 +1,23 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSendMessage, useGetMe, getGetMessagesQueryKey, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Paperclip, Mic, SendHorizontal, X, Square, Trash2, Images, Reply, Pencil, Clock, BarChart2, Plus, Minus } from "lucide-react";
+import { Paperclip, Mic, SendHorizontal, X, Square, Trash2, Images, Reply, Pencil, Clock, BarChart2, Plus, Minus, SmilePlus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+const STICKERS = [
+  { id: "sticker-01", url: "/stickers/sticker-01.svg", label: "Счастье" },
+  { id: "sticker-02", url: "/stickers/sticker-02.svg", label: "Радость" },
+  { id: "sticker-03", url: "/stickers/sticker-03.svg", label: "Крутой" },
+  { id: "sticker-04", url: "/stickers/sticker-04.svg", label: "Мило" },
+  { id: "sticker-05", url: "/stickers/sticker-05.svg", label: "Огонь" },
+  { id: "sticker-06", url: "/stickers/sticker-06.svg", label: "Праздник" },
+  { id: "sticker-07", url: "/stickers/sticker-07.svg", label: "Злюка" },
+  { id: "sticker-08", url: "/stickers/sticker-08.svg", label: "Вечеринка" },
+  { id: "sticker-09", url: "/stickers/sticker-09.svg", label: "Задумался" },
+  { id: "sticker-10", url: "/stickers/sticker-10.svg", label: "Звёздочки" },
+  { id: "sticker-11", url: "/stickers/sticker-11.svg", label: "Гордость" },
+  { id: "sticker-12", url: "/stickers/sticker-12.svg", label: "Сон" },
+];
 
 const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
   { label: "Смайлы", emojis: ["😀","😂","🤣","😊","😍","🥰","😘","😎","🤩","🥳","😭","😤","😡","🤔","😏","😴","🤤","😷","😱","😨","🤯","😮","🥺","😢","😔","😕","😫","🤗","🤭","🫢","🤫","🤥","😶","😐","😑"] },
@@ -78,6 +93,7 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
   const [pollAllowMultiple, setPollAllowMultiple] = useState(false);
   const [pollSending, setPollSending] = useState(false);
   const [pollError, setPollError] = useState("");
+  const [showStickerPanel, setShowStickerPanel] = useState(false);
 
   const queryClient = useQueryClient();
   const sendMessage = useSendMessage();
@@ -307,6 +323,21 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
     textareaRef.current?.focus();
   };
 
+  const sendSticker = async (sticker: { url: string }) => {
+    setShowStickerPanel(false);
+    setIsSending(true);
+    try {
+      await sendMessage.mutateAsync({
+        data: { chatId, type: "sticker", mediaUrl: sticker.url, text: "" }
+      });
+      queryClient.invalidateQueries({ queryKey: getGetMessagesQueryKey({ chatId }) });
+      queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() });
+      onMessageSent?.();
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
     e.target.style.height = "52px";
@@ -377,6 +408,36 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
               >
                 Сохранить
               </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showStickerPanel && (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute bottom-full mb-3 left-0 w-[280px] z-50 bg-card border border-border rounded-[24px] shadow-2xl overflow-hidden origin-bottom-left"
+            >
+              <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                <span className="text-[12px] font-black text-muted-foreground uppercase tracking-wider">Стикеры</span>
+                <button onClick={() => setShowStickerPanel(false)} className="w-6 h-6 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="p-3 grid grid-cols-4 gap-2 max-h-[220px] overflow-y-auto scrollbar-none">
+                {STICKERS.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => sendSticker(s)}
+                    title={s.label}
+                    className="aspect-square rounded-xl hover:bg-secondary transition-all hover:scale-110 active:scale-95 p-1 flex items-center justify-center"
+                  >
+                    <img src={s.url} alt={s.label} className="w-full h-full object-contain" />
+                  </button>
+                ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -597,10 +658,16 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
                 <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />
                 
                 {!editMessage && (
-                  <button type="button" onClick={() => setShowEmoji(v => !v)}
-                    className="w-12 h-12 flex items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors shrink-0 mb-[2px]">
-                    <span className="text-xl leading-none">😀</span>
-                  </button>
+                  <>
+                    <button type="button" onClick={() => { setShowEmoji(v => !v); setShowStickerPanel(false); }}
+                      className="w-12 h-12 flex items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors shrink-0 mb-[2px]">
+                      <span className="text-xl leading-none">😀</span>
+                    </button>
+                    <button type="button" onClick={() => { setShowStickerPanel(v => !v); setShowEmoji(false); }}
+                      className={`w-12 h-12 flex items-center justify-center rounded-full transition-colors shrink-0 mb-[2px] ${showStickerPanel ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
+                      <SmilePlus size={20} />
+                    </button>
+                  </>
                 )}
 
                 <textarea
@@ -615,7 +682,7 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
                   className="flex-1 bg-transparent border-none resize-none max-h-32 min-h-[52px] py-4 px-2 focus:outline-none text-[15px] font-medium placeholder:text-muted-foreground/60 leading-normal scrollbar-none"
                   rows={1}
                   style={{ height: "52px" }}
-                  onFocus={() => setShowEmoji(false)}
+                  onFocus={() => { setShowEmoji(false); setShowStickerPanel(false); }}
                 />
 
                 {!editMessage && !text.trim() && imagePreviews.length === 0 && (

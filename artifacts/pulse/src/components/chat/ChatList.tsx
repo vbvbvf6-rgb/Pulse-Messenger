@@ -416,6 +416,8 @@ export function ChatList({ onMenuClick }: { onMenuClick?: () => void }) {
                   ? "🎤 Голосовое"
                   : lastMessage.type === "call"
                   ? "📞 Звонок"
+                  : lastMessage.type === "sticker"
+                  ? "🎨 Стикер"
                   : `[${lastMessage.type}]`
                 : "Нет сообщений";
 

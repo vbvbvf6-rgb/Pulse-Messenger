@@ -244,5 +244,32 @@ export async function runSeed() {
       WHERE u.is_bot = false AND u.id != ${botId}
         AND NOT EXISTS (SELECT 1 FROM contacts c WHERE c.user_id = u.id AND c.contact_id = ${botId})
     `);
+
+    // Ensure every non-bot user has a direct chat with DeepSeek
+    const users = await db.execute(sql`SELECT id FROM users WHERE is_bot = false AND id != ${botId}`);
+    for (const u of users.rows as any[]) {
+      const existing = await db.execute(sql`
+        SELECT c.id FROM chats c
+        JOIN chat_members cm1 ON cm1.chat_id = c.id AND cm1.user_id = ${u.id}
+        JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_id = ${botId}
+        WHERE c.type = 'direct'
+        LIMIT 1
+      `);
+      if ((existing.rows as any[]).length === 0) {
+        const chatResult = await db.execute(sql`
+          INSERT INTO chats (type, avatar_color) VALUES ('direct', '#8B5CF6') RETURNING id
+        `);
+        const chatId = (chatResult.rows as any[])[0]?.id;
+        if (chatId) {
+          await db.execute(sql`
+            INSERT INTO chat_members (chat_id, user_id, role) VALUES
+              (${chatId}, ${u.id}, 'member'),
+              (${chatId}, ${botId}, 'member')
+            ON CONFLICT DO NOTHING
+          `);
+          console.log(`[seed] Created DeepSeek chat for user ${u.id}`);
+        }
+      }
+    }
   }
 }

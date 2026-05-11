@@ -507,6 +507,17 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin 
         const durSec = parseInt((message.text || "voice:0").replace("voice:", "")) || 0;
         return <VoicePlayer src={message.mediaUrl || ""} durationSec={durSec} isMine={isMine} />;
       }
+      case "sticker":
+        return (
+          <div className="-mx-3 -my-2">
+            <img
+              src={message.mediaUrl || ""}
+              alt="стикер"
+              className="w-28 h-28 object-contain block"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+          </div>
+        );
       case "call":
         return <p className="text-[15px] font-bold italic opacity-80">📞 Звонок завершён</p>;
       default:
@@ -547,12 +558,17 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin 
               onTouchEnd={handleTouchEnd}
               onTouchMove={handleTouchMove}
               className={cn(
-                "relative px-5 py-3.5 rounded-[24px] cursor-pointer transition-transform active:scale-[0.98]",
-                isMine
-                  ? (ownBubbleStyle ? "text-white rounded-br-sm" : "bubble-mine text-primary-foreground rounded-br-sm")
-                  : "bg-card text-foreground rounded-bl-sm border border-border shadow-sm"
+                "relative cursor-pointer transition-transform active:scale-[0.98]",
+                message.type === "sticker"
+                  ? "px-1 py-1 bg-transparent border-none shadow-none"
+                  : cn(
+                    "px-5 py-3.5 rounded-[24px]",
+                    isMine
+                      ? (ownBubbleStyle ? "text-white rounded-br-sm" : "bubble-mine text-primary-foreground rounded-br-sm")
+                      : "bg-card text-foreground rounded-bl-sm border border-border shadow-sm"
+                  )
               )}
-              style={isMine && ownBubbleStyle ? ownBubbleStyle : undefined}
+              style={isMine && ownBubbleStyle && message.type !== "sticker" ? ownBubbleStyle : undefined}
             >
               {!isMine && message.sender && (
                 <p className="text-[12px] font-black mb-1.5 leading-none" style={{ color: message.sender.avatarColor }}>

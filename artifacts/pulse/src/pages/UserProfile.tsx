@@ -109,6 +109,7 @@ export default function UserProfile() {
   const handleMessage = async () => {
     setIsStartingChat(true);
     const uid = sessionStorage.getItem("pulse-user-id");
+    const token = sessionStorage.getItem("pulse-token");
     try {
       const res = await fetch("/api/chats/direct", {
         method: "POST",

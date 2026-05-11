@@ -338,14 +338,14 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     sseRef.current = es;
 
     es.addEventListener("new-message", (e: MessageEvent) => {
-      queryClient.refetchQueries({ queryKey: getGetMessagesQueryKey({ chatId }) }).then(() => {
+      queryClient.invalidateQueries({ queryKey: getGetMessagesQueryKey({ chatId }) }).then(() => {
         const msgs = queryClient.getQueryData<Message[]>(getGetMessagesQueryKey({ chatId }));
         const last = msgs?.[msgs.length - 1];
         if (last && last.senderId !== Number(sessionStorage.getItem("pulse-user-id") || "1")) {
-          const chatData = queryClient.getQueryData<any>(["getGetChatById", chatId]) ?? null;
-          const chatName = chatData?.otherUser?.displayName ?? chatData?.name ?? "Pulse";
+          const chatData = queryClient.getQueryData<any>([`/api/chats/${chatId}`]) ?? null;
+          const chatName = (chatData as any)?.otherUser?.displayName ?? (chatData as any)?.name ?? "Pulse";
           const senderName = last.sender?.displayName || chatName;
-          const body = last.type === "image" ? "📷 Фото" : last.type === "audio" ? "🎤 Голосовое" : last.text || "";
+          const body = last.type === "image" ? "📷 Фото" : last.type === "audio" ? "🎤 Голосовое" : last.type === "sticker" ? "🎨 Стикер" : last.text || "";
           notify(`${senderName}`, { body, url: `/`, tag: `chat-${chatId}` });
         }
       });
