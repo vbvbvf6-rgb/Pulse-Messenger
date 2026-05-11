@@ -54,7 +54,7 @@ router.post("/ai/smart-replies", async (req, res) => {
     }
 
     const context = chatContext || lastMessage;
-    const prompt = `You are a messaging assistant. Generate exactly 3 short, natural reply suggestions for this message: "${String(context).slice(0, 300)}"\n\nRules:\n- Each reply should be 1-8 words\n- Replies must be in the same language as the message\n- Make them varied: positive, neutral, questioning\n- Output ONLY a JSON array of 3 strings, nothing else\n- Example: ["Sounds good!", "Tell me more", "When?"]\n\nJSON array:`;
+    const prompt = `Ты — помощник для мессенджера. Сгенерируй ровно 3 коротких варианта ответа на это сообщение: "${String(context).slice(0, 300)}"\n\nПравила:\n- Каждый вариант — 1-8 слов\n- Отвечай на русском языке по умолчанию. Если сообщение явно на другом языке — используй его\n- Варианты должны быть разными: позитивный, нейтральный, вопрос\n- Выведи ТОЛЬКО JSON-массив из 3 строк, ничего больше\n- Пример: ["Хорошо!", "Расскажи подробнее", "Когда?"]\n\nJSON-массив:`;
 
     const result = await callPollinations(prompt);
     if (!result) {

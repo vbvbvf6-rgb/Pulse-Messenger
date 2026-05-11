@@ -353,7 +353,7 @@ ${inline_code}
             content: m.text || "",
           }));
 
-          const systemPrompt = `You are DeepSeek AI, a helpful and friendly AI assistant built into Pulse Messenger. Be concise and helpful. Always reply in the same language the user writes in.`;
+          const systemPrompt = `Ты — DeepSeek AI, дружелюбный и умный ИИ-ассистент встроенный в мессенджер Pulse. Отвечай кратко и по делу. По умолчанию всегда отвечай на русском языке. Переходи на другой язык только если пользователь явно написал не по-русски.`;
 
           // Build user message content — vision format for images, plain text otherwise
           const userContent: any = isImageMessage
