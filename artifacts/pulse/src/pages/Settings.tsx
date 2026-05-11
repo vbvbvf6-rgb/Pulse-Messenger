@@ -1092,16 +1092,894 @@ export default function Settings() {
   return (
     <div className="flex-1 flex h-full bg-background overflow-hidden">
       {/* Header */}
-      <header className="h-16 border-b border-border flex items-center px-6 justify-between bg-card/80 backdrop-blur-md z-10 shrink-0">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <SettingsIcon className="text-primary" size={22} /> {t("settings.title")}
-        </h1>
-        {hasChanges && (
-          <button
-            onClick={handleSave}
-            disabled={updateMe.isPending}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+      {/* ══════════════════════════════════════════════════════
+          LEFT SIDEBAR — Telegram-style navigation
+      ══════════════════════════════════════════════════════ */}
+      <div className={cn(
+        "flex-col h-full bg-background border-r border-border shrink-0",
+        "md:flex md:w-[300px]",
+        activeSection === null ? "flex w-full" : "hidden"
+      )}>
+        {/* Sidebar header */}
+        <div className="h-16 border-b border-border flex items-center px-5 bg-card/80 backdrop-blur-md shrink-0">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <SettingsIcon size={20} className="text-primary" /> {t("settings.title")}
+          </h1>
+        </div>
+
+        {/* Profile card — taps into account section */}
+        <button
+          onClick={() => setActiveSection("account")}
+          className={cn(
+            "flex items-center gap-4 px-5 py-4 w-full text-left transition-colors border-b border-border",
+            displaySection === "account" ? "bg-primary/5" : "hover:bg-secondary"
+          )}
+        >
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shrink-0 overflow-hidden shadow-md"
+            style={{ backgroundColor: avatarColor }}
           >
+            {avatarPreview
+              ? <img src={avatarPreview} alt="" className="w-full h-full object-cover" />
+              : (displayName[0]?.toUpperCase() || "?")}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-base truncate">{displayName || user?.displayName || "..."}</p>
+            <p className="text-sm text-muted-foreground truncate">@{user?.username}</p>
+            {phoneNumber && <p className="text-xs text-muted-foreground mt-0.5 truncate">{phoneNumber}</p>}
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground shrink-0" />
+        </button>
+
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto scrollbar-none py-2">
+
+          {/* Group 1: Main settings */}
+          <NavGroup>
+            <NavItem id="account"       icon={<User size={16}/>}           color="bg-blue-500"                                        label={lang==="ru"?"Мой аккаунт":"My Account"}           active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="notifications" icon={<Bell size={16}/>}           color="bg-red-500"                                         label={lang==="ru"?"Уведомления и звуки":"Notifications & Sounds"} active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="privacy"       icon={<Lock size={16}/>}           color="bg-gray-500"                                        label={lang==="ru"?"Конфиденц. и безопасность":"Privacy & Security"} active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="chat-settings" icon={<MessageSquare size={16}/>}  color="bg-green-600"                                       label={lang==="ru"?"Настройки чатов":"Chat Settings"}    active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="folders"       icon={<FolderOpen size={16}/>}     color="bg-sky-500"                                         label={lang==="ru"?"Папки с чатами":"Folders"}           active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="advanced"      icon={<SlidersHorizontal size={16}/>} color="bg-slate-600"                                    label={lang==="ru"?"Расширенные":"Advanced"}              active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="speakers"      icon={<Headphones size={16}/>}     color="bg-orange-500"                                      label={lang==="ru"?"Динамики и камера":"Speakers & Camera"} active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="battery"       icon={<Battery size={16}/>}        color="bg-emerald-600"                                     label={lang==="ru"?"Батарея и анимации":"Battery & Animations"} active={displaySection} onClick={setActiveSection}/>
+          </NavGroup>
+
+          {/* Group 2: Interface */}
+          <NavGroup>
+            <NavItem id="language" icon={<Globe size={16}/>}   color="bg-blue-600"   label={lang==="ru"?"Язык":"Language"}             badge={lang==="ru"?"Русский":"English"}  active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="scale"    icon={<Monitor size={16}/>} color="bg-indigo-600" label={lang==="ru"?"Масштаб интерфейса":"Interface Scale"} badge={`${pageZoom}%`} active={displaySection} onClick={setActiveSection}/>
+          </NavGroup>
+
+          {/* Group 3: Premium */}
+          <NavGroup>
+            <NavItem id="prime" icon={<Crown size={16}/>} color="bg-gradient-to-br from-amber-400 to-orange-500"
+              label="Pulse Prime"
+              badge={(user as any)?.hasPrime ? (lang==="ru"?"Активен":"Active") : undefined}
+              badgeAmber={(user as any)?.hasPrime}
+              active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="stars" icon={<Star size={16}/>}  color="bg-gradient-to-br from-yellow-400 to-amber-500"
+              label={lang==="ru"?"Мои звёзды":"My Stars"} badge="0"
+              active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="gift"  icon={<Gift size={16}/>}  color="bg-gradient-to-br from-pink-500 to-rose-600"
+              label={lang==="ru"?"Отправить подарок":"Send a Gift"} href="/gifts"
+              active={displaySection} onClick={setActiveSection}/>
+          </NavGroup>
+
+          {/* Group 4: Help */}
+          <NavGroup>
+            <NavItem id="faq"      icon={<HelpCircle size={16}/>} color="bg-teal-500"   label="Pulse FAQ"                                    active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="features" icon={<Layers size={16}/>}     color="bg-cyan-600"   label={lang==="ru"?"Возможности Pulse":"Pulse Features"} active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="support"  icon={<Shield size={16}/>}     color="bg-green-600"  label={lang==="ru"?"Поддержка":"Support"}             active={displaySection} onClick={setActiveSection}/>
+            <NavItem id="dev"      icon={<Bot size={16}/>}         color="bg-gradient-to-br from-violet-500 to-indigo-600"
+              label={lang==="ru"?"Разработчику":"Developer"} href="/bots"
+              active={displaySection} onClick={setActiveSection}/>
+          </NavGroup>
+
+          {/* Logout */}
+          <div className="mx-3 mt-1 mb-8">
+            <button
+              onClick={() => setShowLogoutDialog(true)}
+              className="flex items-center gap-2.5 text-destructive hover:bg-destructive/8 px-4 py-3 rounded-xl font-semibold transition-colors w-full text-sm"
+            >
+              <LogOut size={17} /> {t("settings.logout")}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════
+          RIGHT CONTENT PANEL
+      ══════════════════════════════════════════════════════ */}
+      <div className={cn(
+        "flex-col h-full overflow-hidden flex-1",
+        "md:flex",
+        activeSection !== null ? "flex" : "hidden"
+      )}>
+
+        {/* Content header */}
+        <header className="h-16 border-b border-border flex items-center px-5 gap-3 bg-card/80 backdrop-blur-md shrink-0">
+          <button
+            onClick={() => setActiveSection(null)}
+            className="md:hidden w-9 h-9 rounded-xl hover:bg-secondary flex items-center justify-center text-muted-foreground transition-colors shrink-0"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h2 className="text-lg font-bold flex-1 truncate">
+            {displaySection === "account"       ? (lang==="ru"?"Мой аккаунт":"My Account")
+            : displaySection === "notifications" ? (lang==="ru"?"Уведомления и звуки":"Notifications & Sounds")
+            : displaySection === "privacy"       ? (lang==="ru"?"Конфиденциальность и безопасность":"Privacy & Security")
+            : displaySection === "chat-settings" ? (lang==="ru"?"Настройки чатов":"Chat Settings")
+            : displaySection === "folders"       ? (lang==="ru"?"Папки с чатами":"Folders")
+            : displaySection === "advanced"      ? (lang==="ru"?"Расширенные":"Advanced")
+            : displaySection === "speakers"      ? (lang==="ru"?"Динамики и камера":"Speakers & Camera")
+            : displaySection === "battery"       ? (lang==="ru"?"Батарея и анимации":"Battery & Animations")
+            : displaySection === "language"      ? (lang==="ru"?"Язык":"Language")
+            : displaySection === "scale"         ? (lang==="ru"?"Масштаб интерфейса":"Interface Scale")
+            : displaySection === "prime"         ? "Pulse Prime"
+            : displaySection === "stars"         ? (lang==="ru"?"Мои звёзды":"My Stars")
+            : displaySection === "faq"           ? "Pulse FAQ"
+            : displaySection === "features"      ? (lang==="ru"?"Возможности Pulse":"Pulse Features")
+            : displaySection === "support"       ? (lang==="ru"?"Поддержка":"Support")
+            : ""}
+          </h2>
+          {displaySection === "account" && hasChanges && (
+            <button
+              onClick={handleSave}
+              disabled={updateMe.isPending}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 shrink-0"
+            >
+              {saved ? <CheckCircle size={16}/> : <Save size={16}/>}
+              {saved ? t("common.saved") : t("common.save")}
+            </button>
+          )}
+        </header>
+
+        {/* Scrollable section content */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 space-y-6">
+
+          {/* ─── MY ACCOUNT ─────────────────────────────────── */}
+          {displaySection === "account" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={t("settings.profile")} icon={<Edit3 size={13}/>}>
+                <div className="p-4">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div
+                      className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-2xl shrink-0 shadow-lg overflow-hidden"
+                      style={{ backgroundColor: avatarColor }}
+                    >
+                      {avatarPreview
+                        ? <img src={avatarPreview} alt="" className="w-full h-full object-cover" onError={() => setAvatarUrl("")}/>
+                        : displayName[0]?.toUpperCase() || "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">{displayName || "..."}</p>
+                      <p className="text-sm text-muted-foreground truncate">@{user?.username || "username"}</p>
+                      {statusText && <p className="text-xs text-muted-foreground mt-0.5 truncate">{statusText}</p>}
+                    </div>
+                    <button
+                      onClick={handleCopyProfileLink}
+                      className="shrink-0 p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                      title={t("settings.copyLink")}
+                    >
+                      {linkCopied ? <Check size={18} className="text-green-500"/> : <Copy size={18}/>}
+                    </button>
+                  </div>
+
+                  <div className="mb-3">
+                    <Label className="text-xs text-muted-foreground mb-1.5 block flex items-center gap-1.5">
+                      <Camera size={11}/> {t("settings.avatarUrl")}
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => avatarFileRef.current?.click()}
+                        className="flex items-center gap-2 px-3 py-2 bg-secondary border border-border rounded-xl text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+                      >
+                        <Upload size={14}/> {lang==="ru"?"Загрузить фото":"Upload photo"}
+                      </button>
+                      {avatarUrl && (
+                        <button type="button" onClick={() => setAvatarUrl("")}
+                          className="px-3 py-2 text-sm text-destructive/70 hover:text-destructive transition-colors">
+                          {lang==="ru"?"Удалить":"Remove"}
+                        </button>
+                      )}
+                    </div>
+                    <input ref={avatarFileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarFile}/>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1.5 block">{t("settings.avatarColor")}</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {AVATAR_COLORS.map(color => (
+                        <button key={color} onClick={() => setAvatarColor(color)}
+                          className={`w-7 h-7 rounded-full transition-transform hover:scale-110 ${avatarColor === color ? "ring-2 ring-offset-2 ring-offset-card ring-white scale-110" : ""}`}
+                          style={{ backgroundColor: color }}/>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 space-y-4 border-t border-border">
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block">{t("settings.displayName")}</Label>
+                    <Input value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder={t("settings.displayNamePlaceholder")} className="bg-background"/>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block flex items-center gap-1.5"><User size={13}/> {t("settings.username")}</Label>
+                    {!showUsernameEdit ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-xl text-sm text-foreground">
+                          <span className="text-muted-foreground">@</span>
+                          <span className="font-mono">{user?.username || "—"}</span>
+                        </div>
+                        {usernameCooldown ? (
+                          <div className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl shrink-0">
+                            <Clock size={13} className="text-yellow-500 shrink-0"/>
+                            <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium whitespace-nowrap">{t("settings.usernameCooldown")} {usernameCooldown}</span>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setShowUsernameEdit(true); setNewUsername(user?.username || ""); setUsernameError(""); }}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 border border-primary/20 rounded-xl text-primary text-xs font-medium hover:bg-primary/20 transition-colors shrink-0">
+                            <Edit3 size={13}/> {t("settings.usernameChange")}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 flex items-center border border-border rounded-xl overflow-hidden bg-background focus-within:border-primary transition-colors">
+                            <span className="px-3 text-muted-foreground text-sm font-mono select-none">@</span>
+                            <input value={newUsername}
+                              onChange={e => { setNewUsername(e.target.value); setUsernameError(""); }}
+                              onKeyDown={e => { if (e.key==="Enter") handleChangeUsername(); if (e.key==="Escape") setShowUsernameEdit(false); }}
+                              placeholder={user?.username || "new_username"} autoFocus
+                              className="flex-1 py-2 pr-3 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none font-mono"
+                              maxLength={32}/>
+                          </div>
+                          <button onClick={handleChangeUsername} disabled={usernameLoading}
+                            className="px-3 py-2 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 shrink-0">
+                            {usernameLoading ? "..." : t("settings.usernameSave")}
+                          </button>
+                          <button onClick={() => { setShowUsernameEdit(false); setUsernameError(""); }}
+                            className="p-2 rounded-xl hover:bg-secondary transition-colors text-muted-foreground shrink-0">
+                            <X size={16}/>
+                          </button>
+                        </div>
+                        {usernameError && <div className="flex items-center gap-1.5 text-xs text-red-500"><AlertTriangle size={12} className="shrink-0"/> {usernameError}</div>}
+                        <p className="text-xs text-muted-foreground">{t("settings.usernameNote")}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block">{t("settings.bio")}</Label>
+                    <Textarea value={bio} onChange={e => setBio(e.target.value)} placeholder={t("settings.bioPlaceholder")} rows={3} className="bg-background resize-none"/>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium mb-1 block flex items-center gap-1.5"><Phone size={13}/> {t("settings.phone")}</Label>
+                    <Input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder={t("settings.phonePlaceholder")} type="tel" className="bg-background"/>
+                    <p className="text-xs text-muted-foreground mt-1">{t("settings.phoneNote")}</p>
+                  </div>
+                </div>
+
+                <div className="p-4 border-t border-border">
+                  <Label className="text-sm font-medium mb-2 block">{t("settings.statusText")}</Label>
+                  <Input value={statusText} onChange={e => setStatusText(e.target.value)} placeholder={t("settings.statusPlaceholder")} className="bg-background mb-3"/>
+                  <div className="flex flex-wrap gap-2">
+                    {STATUS_PRESETS.map(preset => {
+                      const presetText = `${preset.emoji} ${lang==="ru" ? preset.ru : preset.en}`;
+                      return (
+                        <button key={preset.ru} onClick={() => setStatusText(presetText)}
+                          className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${statusText===presetText ? "bg-primary/10 border-primary text-primary" : "border-border hover:border-primary/50 hover:bg-secondary"}`}>
+                          {presetText}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </Section>
+
+              <Section title={t("settings.onlineStatus")} icon={<Radio size={13}/>}>
+                <div className="p-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {ONLINE_STATUS_OPTIONS.map(opt => (
+                      <button key={opt.value} onClick={() => setOnlineStatus(opt.value)}
+                        className={`p-3 rounded-xl border text-left transition-all ${onlineStatus===opt.value ? "border-primary bg-primary/8" : "border-border hover:border-primary/30 hover:bg-secondary"}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`w-2.5 h-2.5 rounded-full ${opt.color}`}/>
+                          <span className="text-sm font-medium">{opt.label}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Section>
+
+              {hasChanges && (
+                <div className="sticky bottom-0 bg-card/95 backdrop-blur-md border border-border p-4 rounded-2xl flex items-center justify-between gap-3 shadow-lg">
+                  <p className="text-sm text-muted-foreground">{t("settings.unsavedChanges")}</p>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => { if (user) { setDisplayName(user.displayName||""); setBio(user.bio||""); setStatusText((user as any).statusText||""); setAvatarColor(user.avatarColor||"#3B82F6"); setAvatarUrl((user as any).avatarUrl||""); setPhoneNumber((user as any).phoneNumber||""); setOnlineStatus((user.status as any)||"online"); }}}
+                      className="px-4 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors border border-border">
+                      {t("common.cancel")}
+                    </button>
+                    <button onClick={handleSave} disabled={updateMe.isPending}
+                      className="flex items-center gap-2 px-5 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
+                      {saved ? <CheckCircle size={16}/> : <Save size={16}/>}
+                      {updateMe.isPending ? t("common.saving") : saved ? t("common.saved") : t("common.save")}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── NOTIFICATIONS ─────────────────────────────── */}
+          {displaySection === "notifications" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <NotificationPermissionBanner/>
+              <Section title={t("settings.notifications")} icon={<Bell size={13}/>}>
+                <Row icon={<Bell size={18}/>} color="bg-primary/10 text-primary"
+                  label={t("settings.notifyMessages")} desc={t("settings.notifyMessagesDesc")}
+                  right={<Switch checked={notifyMessages} onCheckedChange={v => { setNotifyMessages(v); setLs("pulse-notify-messages", v); toast({ title: v ? t("notify.on") : t("notify.off"), description: t("settings.notifyMessages") }); }}/>}/>
+                <Row icon={<Volume2 size={18}/>} color="bg-blue-500/10 text-blue-500"
+                  label={t("settings.notifySounds")} desc={t("settings.notifySoundsDesc")}
+                  right={<Switch checked={notifySounds} onCheckedChange={v => { setNotifySounds(v); setLs("pulse-notify-sounds", v); toast({ title: v ? t("notify.on") : t("notify.off"), description: t("settings.notifySounds") }); }}/>}/>
+                <Row icon={<Gift size={18}/>} color="bg-pink-500/10 text-pink-500"
+                  label={t("settings.notifyGifts")} desc={t("settings.notifyGiftsDesc")}
+                  right={<Switch checked={notifyGifts} onCheckedChange={v => { setNotifyGifts(v); setLs("pulse-notify-gifts", v); }}/>}/>
+                <Row icon={<PhoneCall size={18}/>} color="bg-green-500/10 text-green-500"
+                  label={t("settings.notifyCalls")} desc={t("settings.notifyCallsDesc")}
+                  right={<Switch checked={notifyCalls} onCheckedChange={v => { setNotifyCalls(v); setLs("pulse-notify-calls", v); }}/>}/>
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-500/10 text-purple-500 rounded-xl"><Eye size={18}/></div>
+                      <div>
+                        <p className="text-sm font-medium">{t("settings.notifyPreview")}</p>
+                        <p className="text-xs text-muted-foreground">{notifyPreview ? t("settings.notifyPreviewOn") : t("settings.notifyPreviewOff")}</p>
+                      </div>
+                    </div>
+                    <Switch checked={notifyPreview} onCheckedChange={v => { setNotifyPreview(v); setLs("pulse-notify-preview", v); }}/>
+                  </div>
+                  {!notifyMessages && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-xl px-3 py-2">
+                      <BellOff size={13}/> {t("settings.notifyDisabled")}
+                    </div>
+                  )}
+                </div>
+              </Section>
+            </div>
+          )}
+
+          {/* ─── PRIVACY & SECURITY ────────────────────────── */}
+          {displaySection === "privacy" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={t("settings.privacy")} icon={<Shield size={13}/>}>
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-teal-500/10 text-teal-500 rounded-xl"><Clock size={18}/></div>
+                    <div>
+                      <p className="text-sm font-medium">{t("settings.lastSeen")}</p>
+                      <p className="text-xs text-muted-foreground">{t("settings.lastSeenDesc")}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {LAST_SEEN_OPTIONS.map(opt => (
+                      <button key={opt.value}
+                        onClick={() => { setLastSeenVisibility(opt.value); setLs("pulse-privacy-last-seen", opt.value); toast({ title: t("common.saved"), description: `${t("settings.lastSeen")}: ${opt.label}` }); }}
+                        className={`flex-1 py-2 rounded-xl border text-xs font-medium transition-all flex flex-col items-center gap-0.5 ${lastSeenVisibility===opt.value ? "border-primary bg-primary/8 text-primary" : "border-border hover:border-primary/30"}`}>
+                        {opt.label}
+                        {lastSeenVisibility===opt.value && <CheckCircle size={10} className="text-primary"/>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <Row icon={<CheckCircle size={18}/>} color="bg-blue-500/10 text-blue-500"
+                  label={t("settings.readReceipts")} desc={t("settings.readReceiptsDesc")}
+                  right={<Switch checked={readReceipts} onCheckedChange={v => { setReadReceipts(v); setLs("pulse-privacy-read-receipts", v); updateMe.mutate({ data: { readReceiptsEnabled: v } as any }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }) }); toast({ title: t("common.saved") }); }}/>}/>
+                <Row icon={<User size={18}/>} color="bg-green-500/10 text-green-500"
+                  label={t("settings.showOnlineStatus")}
+                  desc={(user as any)?.hasPrime ? t("settings.showOnlineStatusDesc") : (lang==="ru"?"Только для Pulse Prime участников":"Pulse Prime members only")}
+                  right={(user as any)?.hasPrime
+                    ? <Switch checked={showOnlineStatusToggle} onCheckedChange={v => { setShowOnlineStatusToggle(v); setLs("pulse-privacy-show-online", v); updateMe.mutate({ data: { showOnlineStatus: v } as any }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }) }); }}/>
+                    : <a href="/prime" className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"><Crown size={9}/> Prime</a>}/>
+                <Row icon={<Camera size={18}/>} color="bg-violet-500/10 text-violet-500"
+                  label={t("settings.profilePhoto")} desc={profilePhotoVisible ? t("settings.profilePhotoOn") : t("settings.profilePhotoOff")}
+                  right={<Switch checked={profilePhotoVisible} onCheckedChange={v => { setProfilePhotoVisible(v); setLs("pulse-privacy-photo-visible", v); }}/>}/>
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-orange-500/10 text-orange-500 rounded-xl"><Flame size={18}/></div>
+                    <div>
+                      <p className="text-sm font-medium">{t("autodelete.globalDefault")}</p>
+                      <p className="text-xs text-muted-foreground">{t("autodelete.globalDefaultDesc")}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[{ label: t("autodelete.off"), value: null },{ label:"5с",value:5},{ label:"1м",value:60},{ label:"1ч",value:3600},{ label:"1д",value:86400},{ label:"1нед",value:604800}].map(opt => (
+                      <button key={String(opt.value)}
+                        onClick={() => { setGlobalAutoDelete(opt.value); localStorage.setItem("pulse-global-auto-delete", String(opt.value)); toast({ title: t("common.saved") }); }}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${globalAutoDelete===opt.value ? "border-primary bg-primary/8 text-primary" : "border-border hover:border-primary/30"}`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Section>
+
+              <Section title={t("settings.security")} icon={<ShieldCheck size={13}/>}>
+                <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-secondary transition-colors" onClick={() => setShowChangePassword(!showChangePassword)}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-500/10 text-purple-500 rounded-xl"><Key size={18}/></div>
+                    <div>
+                      <p className="text-sm font-medium">{t("settings.changePassword")}</p>
+                      <p className="text-xs text-muted-foreground">{t("settings.changePasswordDesc")}</p>
+                    </div>
+                  </div>
+                  {showChangePassword ? <ChevronDown size={18} className="text-muted-foreground"/> : <ChevronRight size={18} className="text-muted-foreground"/>}
+                </div>
+                {showChangePassword && (
+                  <div className="p-4 space-y-3 bg-background/50">
+                    <div className="relative">
+                      <Label className="text-sm mb-1 block">{t("settings.currentPassword")}</Label>
+                      <Input type={showCurrentPw?"text":"password"} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder={t("settings.currentPassword")} className="bg-background pr-10"/>
+                      <button type="button" onClick={() => setShowCurrentPw(v => !v)} className="absolute right-3 bottom-2.5 text-muted-foreground hover:text-foreground">{showCurrentPw ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+                    </div>
+                    <div className="relative">
+                      <Label className="text-sm mb-1 block">{t("settings.newPassword")}</Label>
+                      <Input type={showNewPw?"text":"password"} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder={t("settings.passwordMinLength")} className="bg-background pr-10"/>
+                      <button type="button" onClick={() => setShowNewPw(v => !v)} className="absolute right-3 bottom-2.5 text-muted-foreground hover:text-foreground">{showNewPw ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+                    </div>
+                    <div>
+                      <Label className="text-sm mb-1 block">{t("settings.confirmPassword")}</Label>
+                      <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder={t("settings.confirmPassword")} className="bg-background"/>
+                    </div>
+                    {newPassword && confirmPassword && newPassword!==confirmPassword && <p className="text-xs text-destructive flex items-center gap-1"><AlertTriangle size={12}/> {t("settings.passwordMismatch")}</p>}
+                    <button onClick={handleChangePassword} disabled={pwLoading}
+                      className="w-full py-2.5 bg-primary text-primary-foreground rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50">
+                      {pwLoading ? t("settings.passwordChanging") : t("settings.passwordChange")}
+                    </button>
+                  </div>
+                )}
+                <Row icon={<Monitor size={18}/>} color="bg-primary/10 text-primary"
+                  label={t("settings.activeSessions")}
+                  desc={`${lang==="ru"?"Браузер":"Browser"}: ${navigator.userAgent.includes("Chrome")?"Chrome":navigator.userAgent.includes("Firefox")?"Firefox":(lang==="ru"?"Другой":"Other")}`}
+                  onClick={handleEndSessions} right={<span className="text-xs text-muted-foreground">{t("settings.endSessions")}</span>}/>
+                <TwoFaSection user={user} toast={toast} lang={lang}/>
+                <ScreenLockSection lang={lang} toast={toast}/>
+                <SecurityQuestionSection lang={lang} toast={toast}/>
+              </Section>
+            </div>
+          )}
+
+          {/* ─── CHAT SETTINGS ─────────────────────────────── */}
+          {displaySection === "chat-settings" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={lang==="ru"?"Настройки чатов":"Chat Settings"} icon={<MessageSquare size={13}/>}>
+                <Row icon={<Link size={18}/>} color="bg-blue-500/10 text-blue-500"
+                  label={lang==="ru"?"Предпросмотр ссылок":"Link Preview"}
+                  desc={lang==="ru"?"Показывать превью ссылок в сообщениях":"Show link previews in messages"}
+                  right={<Switch checked={linkPreview} onCheckedChange={v => { setLinkPreview(v); setLs("pulse-link-preview", v); toast({ title: t("common.saved") }); }}/>}/>
+                <Row icon={<MessageSquare size={18}/>} color="bg-green-500/10 text-green-500"
+                  label={lang==="ru"?"Отправка по Enter":"Send on Enter"}
+                  desc={lang==="ru"?"Enter отправляет сообщение, Shift+Enter — новая строка":"Enter sends message, Shift+Enter for new line"}
+                  right={<Switch checked={sendOnEnter} onCheckedChange={v => { setSendOnEnter(v); setLs("pulse-send-on-enter", v); toast({ title: t("common.saved") }); }}/>}/>
+                <Row icon={<Zap size={18}/>} color="bg-yellow-500/10 text-yellow-500"
+                  label={lang==="ru"?"Анимированные эмодзи":"Animated Emoji"}
+                  desc={lang==="ru"?"Воспроизводить анимации эмодзи в чатах":"Play emoji animations in chats"}
+                  right={<Switch checked={animatedEmoji} onCheckedChange={v => { setAnimatedEmoji(v); setLs("pulse-animated-emoji", v); toast({ title: t("common.saved") }); }}/>}/>
+                <Row icon={<Calendar size={18}/>} color="bg-violet-500/10 text-violet-500"
+                  label={lang==="ru"?"Группировка по дате":"Group by Date"}
+                  desc={lang==="ru"?"Разделять сообщения по датам":"Separate messages by date"}
+                  right={<Switch checked={msgGroupDate} onCheckedChange={v => { setMsgGroupDate(v); setLs("pulse-msg-group-date", v); toast({ title: t("common.saved") }); }}/>}/>
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-orange-500/10 text-orange-500 rounded-xl"><Type size={18}/></div>
+                    <div>
+                      <p className="text-sm font-medium">{lang==="ru"?"Размер эмодзи":"Emoji Size"}</p>
+                      <p className="text-xs text-muted-foreground">{lang==="ru"?"Размер больших эмодзи в сообщениях":"Size of large emoji in messages"}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[{ value:"small", label:lang==="ru"?"Маленький":"Small", px:"20px" },{ value:"medium", label:lang==="ru"?"Средний":"Medium", px:"28px" },{ value:"large", label:lang==="ru"?"Большой":"Large", px:"36px" }].map(opt => (
+                      <button key={opt.value} onClick={() => { setEmojiSize(opt.value); setLs("pulse-emoji-size", opt.value); toast({ title: t("common.saved") }); }}
+                        className={`py-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1 ${emojiSize===opt.value ? "border-primary bg-primary/8 text-primary" : "border-border hover:border-primary/30"}`}
+                        style={{ fontSize: opt.px }}>
+                        😊
+                        <span className="text-xs text-muted-foreground" style={{ fontSize:"11px" }}>{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Section>
+            </div>
+          )}
+
+          {/* ─── FOLDERS ───────────────────────────────────── */}
+          {displaySection === "folders" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={lang==="ru"?"Папки с чатами":"Chat Folders"} icon={<FolderOpen size={13}/>}>
+                {[
+                  { key:"all",    label:lang==="ru"?"Все чаты":"All Chats",          emoji:"💬", desc:lang==="ru"?"Все ваши диалоги":"All your conversations" },
+                  { key:"unread", label:lang==="ru"?"Непрочитанные":"Unread",        emoji:"🔵", desc:lang==="ru"?"Чаты с новыми сообщениями":"Chats with new messages" },
+                  { key:"groups", label:lang==="ru"?"Группы и каналы":"Groups & Channels", emoji:"👥", desc:lang==="ru"?"Групповые чаты и каналы":"Group chats and channels" },
+                  { key:"bots",   label:lang==="ru"?"Боты":"Bots",                   emoji:"🤖", desc:lang==="ru"?"Чаты с ботами":"Bot conversations" },
+                ].map((folder, idx, arr) => (
+                  <div key={folder.key} className={`p-4 flex items-center gap-4 ${idx < arr.length-1 ? "border-b border-border" : ""}`}>
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-xl shrink-0">{folder.emoji}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">{folder.label}</p>
+                      <p className="text-xs text-muted-foreground">{folder.desc}</p>
+                    </div>
+                    <span className="text-xs font-bold px-2 py-1 bg-secondary rounded-lg text-muted-foreground shrink-0">{lang==="ru"?"Встроено":"Built-in"}</span>
+                  </div>
+                ))}
+              </Section>
+              <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-xl text-primary shrink-0"><FolderOpen size={16}/></div>
+                <p className="text-sm text-muted-foreground">{lang==="ru"?"Пользовательские папки появятся в будущих обновлениях":"Custom folders coming in a future update"}</p>
+              </div>
+            </div>
+          )}
+
+          {/* ─── ADVANCED ──────────────────────────────────── */}
+          {displaySection === "advanced" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={lang==="ru"?"Загрузка и данные":"Data & Downloads"} icon={<Download size={13}/>}>
+                <Row icon={<Download size={18}/>} color="bg-blue-500/10 text-blue-500"
+                  label={lang==="ru"?"Экономия трафика":"Data Saver"}
+                  desc={lang==="ru"?"Загружать изображения в низком качестве":"Load images in lower quality"}
+                  right={<Switch checked={dataSaver} onCheckedChange={v => { setDataSaver(v); setLs("pulse-data-saver", v); toast({ title: t("common.saved") }); }}/>}/>
+                <Row icon={<Download size={18}/>} color="bg-green-500/10 text-green-500"
+                  label={lang==="ru"?"Автозагрузка фото":"Auto-download Photos"}
+                  desc={lang==="ru"?"Автоматически загружать фото в чатах":"Automatically download photos in chats"}
+                  right={<Switch checked={autoDownload} onCheckedChange={v => { setAutoDownload(v); setLs("pulse-auto-download", v); toast({ title: t("common.saved") }); }}/>}/>
+              </Section>
+              <Section title={t("settings.storage")} icon={<Database size={13}/>}>
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 bg-orange-500/10 text-orange-500 rounded-xl"><Database size={18}/></div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-baseline">
+                        <p className="text-sm font-medium">{t("settings.localCache")}</p>
+                        <span className="text-sm font-bold text-orange-500">{storageSize} {lang==="ru"?"КБ":"KB"}</span>
+                      </div>
+                      <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full transition-all" style={{ width:`${Math.min(100,(Number(storageSize)/100)*100)}%` }}/>
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={handleClearCache}
+                    className="flex items-center gap-2 w-full py-2.5 px-4 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium">
+                    <Trash2 size={15}/> {t("settings.clearCache")}
+                  </button>
+                </div>
+                <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-secondary transition-colors" onClick={handleExportData}>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-500/10 text-green-500 rounded-xl"><Download size={18}/></div>
+                    <div>
+                      <p className="text-sm font-medium">{t("settings.exportData")}</p>
+                      <p className="text-xs text-muted-foreground">{t("settings.exportDataDesc")}</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-muted-foreground"/>
+                </div>
+              </Section>
+            </div>
+          )}
+
+          {/* ─── SPEAKERS & CAMERA ────────────────────────── */}
+          {displaySection === "speakers" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={lang==="ru"?"Устройства ввода/вывода":"Input/Output Devices"} icon={<Headphones size={13}/>}>
+                {[
+                  { icon:<Mic size={22} className="text-orange-500"/>, bg:"bg-orange-500/10 border-orange-500/20", title:lang==="ru"?"Микрофон":"Microphone", desc:lang==="ru"?"Системный микрофон по умолчанию":"System default microphone" },
+                  { icon:<Headphones size={22} className="text-blue-500"/>, bg:"bg-blue-500/10 border-blue-500/20", title:lang==="ru"?"Динамики":"Speakers", desc:lang==="ru"?"Системный динамик по умолчанию":"System default speakers" },
+                  { icon:<Camera size={22} className="text-violet-500"/>, bg:"bg-violet-500/10 border-violet-500/20", title:lang==="ru"?"Камера":"Camera", desc:lang==="ru"?"Системная камера по умолчанию":"System default camera" },
+                ].map((dev, i, arr) => (
+                  <div key={i} className={`p-4 flex items-center gap-4 ${i < arr.length-1 ? "border-b border-border" : ""}`}>
+                    <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 ${dev.bg}`}>{dev.icon}</div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{dev.title}</p>
+                      <p className="text-xs text-muted-foreground">{dev.desc}</p>
+                    </div>
+                    <span className="text-xs font-bold px-2.5 py-1 bg-green-500/10 text-green-500 border border-green-500/20 rounded-lg shrink-0">{lang==="ru"?"Активен":"Active"}</span>
+                  </div>
+                ))}
+              </Section>
+              <div className="bg-card border border-border rounded-2xl p-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  {lang==="ru"?"Управление устройствами доступно через настройки браузера и ОС.":"Manage devices through your browser and OS settings."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ─── BATTERY & ANIMATIONS ─────────────────────── */}
+          {displaySection === "battery" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={lang==="ru"?"Производительность":"Performance"} icon={<Battery size={13}/>}>
+                <Row icon={<Smartphone size={18}/>} color="bg-green-500/10 text-green-500"
+                  label={t("settings.reduceAnimations")} desc={t("settings.reduceAnimationsDesc")}
+                  right={<Switch checked={reduceAnimations} onCheckedChange={v => { setReduceAnimations(v); setLs("pulse-reduce-animations", v); }}/>}/>
+                <Row icon={<Battery size={18}/>} color="bg-emerald-500/10 text-emerald-500"
+                  label={lang==="ru"?"Режим экономии заряда":"Power Saving Mode"}
+                  desc={lang==="ru"?"Отключить фоновые анимации и эффекты":"Disable background animations and effects"}
+                  right={<Switch checked={powerSaving} onCheckedChange={v => { setPowerSaving(v); setLs("pulse-power-saving", v); toast({ title: t("common.saved") }); }}/>}/>
+                <Row icon={<Zap size={18}/>} color="bg-yellow-500/10 text-yellow-500"
+                  label={lang==="ru"?"Анимированные подарки":"Animated Gifts"}
+                  desc={lang==="ru"?"Воспроизводить анимации при получении подарка":"Play animations when receiving gifts"}
+                  right={<Switch checked={!powerSaving} onCheckedChange={v => { setPowerSaving(!v); setLs("pulse-power-saving", !v); }}/>}/>
+              </Section>
+            </div>
+          )}
+
+          {/* ─── LANGUAGE ──────────────────────────────────── */}
+          {displaySection === "language" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={lang==="ru"?"Язык интерфейса":"Interface Language"} icon={<Globe size={13}/>}>
+                {LANGUAGE_OPTIONS.map((opt, idx) => (
+                  <div key={opt.value}
+                    onClick={() => { setLanguage(opt.value); setLs("pulse-language", opt.value); setLang(opt.value as any); toast({ title: t("common.saved"), description: opt.label }); }}
+                    className={`p-4 flex items-center gap-4 cursor-pointer transition-colors ${idx<LANGUAGE_OPTIONS.length-1?"border-b border-border":""} ${language===opt.value?"bg-primary/5":"hover:bg-secondary"}`}>
+                    <span className="text-2xl">{opt.flag}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{opt.label}</p>
+                    </div>
+                    {language===opt.value && <CheckCircle size={18} className="text-primary shrink-0"/>}
+                  </div>
+                ))}
+              </Section>
+            </div>
+          )}
+
+          {/* ─── INTERFACE SCALE ───────────────────────────── */}
+          {displaySection === "scale" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={lang==="ru"?"Масштаб страницы":"Page Scale"} icon={<Monitor size={13}/>}>
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-primary/10 text-primary rounded-xl"><Monitor size={18}/></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{lang==="ru"?"Масштаб интерфейса":"Interface Scale"}</p>
+                      <p className="text-xs text-muted-foreground">{lang==="ru"?"Изменить размер всего интерфейса":"Scale the entire interface"}</p>
+                    </div>
+                    <span className="text-sm font-bold text-primary min-w-[3rem] text-right">{pageZoom}%</span>
+                  </div>
+                  <input type="range" min={75} max={150} step={5} value={pageZoom}
+                    onChange={e => { const v=e.target.value; setPageZoom(v); setLs("pulse-page-zoom", v); (document.documentElement as any).style.zoom=`${v}%`; }}
+                    className="w-full accent-primary"/>
+                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                    <span>75%</span><span>100%</span><span>150%</span>
+                  </div>
+                </div>
+              </Section>
+              <Section title={t("settings.fontSize")} icon={<Type size={13}/>}>
+                <div className="p-4">
+                  <div className="grid grid-cols-3 gap-2">
+                    {FONT_SIZE_OPTIONS.map(opt => (
+                      <button key={opt.value}
+                        onClick={() => { setFontSize(opt.value); setLs("pulse-font-size", opt.value); toast({ title: t("common.saved"), description: `${t("settings.fontSize")}: ${opt.label}` }); }}
+                        className={`py-2.5 rounded-xl border text-center transition-all flex flex-col items-center gap-0.5 ${fontSize===opt.value ? "border-primary bg-primary/8 text-primary" : "border-border hover:border-primary/30"}`}
+                        style={{ fontSize: opt.size }}>
+                        {opt.label}
+                        {fontSize===opt.value && <CheckCircle size={12} className="text-primary"/>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Section>
+              <Section title={lang==="ru"?"Оформление":"Appearance"} icon={<Palette size={13}/>}>
+                <Row icon={isDark ? <Moon size={18}/> : <Sun size={18}/>} color="bg-primary/10 text-primary"
+                  label={isDark ? t("settings.darkTheme") : t("settings.lightTheme")}
+                  desc={isDark ? t("settings.darkThemeDesc") : t("settings.lightThemeDesc")}
+                  right={<Switch checked={isDark} onCheckedChange={toggleTheme}/>}/>
+              </Section>
+            </div>
+          )}
+
+          {/* ─── PULSE PRIME ───────────────────────────────── */}
+          {displaySection === "prime" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              {(user as any)?.hasPrime ? (
+                <Section title="Pulse Prime" icon={<Crown size={13}/>}>
+                  <div className="p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shrink-0"><Crown size={20} className="text-white"/></div>
+                      <div>
+                        <p className="font-semibold text-sm text-amber-400">{lang==="ru"?"Подписка активна":"Subscription active"}</p>
+                        {(user as any)?.primeExpiresAt && <p className="text-xs text-muted-foreground">{lang==="ru"?"До":"Until"}: {new Date((user as any).primeExpiresAt).toLocaleDateString(lang==="ru"?"ru-RU":"en-US")}</p>}
+                      </div>
+                    </div>
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{lang==="ru"?"Тема интерфейса":"Interface Theme"}</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {PRIME_THEMES.map(theme => {
+                          const isActive = primeTheme === theme.id;
+                          return (
+                            <button key={theme.id} title={theme.name}
+                              onClick={() => { setPrimeTheme(theme.id); localStorage.setItem("pulse-prime-theme", theme.id); applyPrimeTheme(theme.id); toast({ title: lang==="ru"?"Тема применена":"Theme applied", description:`${theme.emoji} ${theme.name}` }); }}
+                              className={`relative flex flex-col items-center gap-1.5 rounded-xl p-2 transition-all border ${isActive ? "border-primary bg-primary/10 scale-[1.03] shadow-md shadow-primary/20" : "border-border/50 bg-card/50 hover:border-primary/40 hover:bg-primary/5"}`}>
+                              <div className="w-8 h-8 rounded-full ring-2 ring-white/10 shadow-md" style={{ background:`hsl(${theme.vars["--primary"]})` }}>
+                                <div className="w-full h-full rounded-full" style={{ background:`radial-gradient(circle at 30% 30%, hsl(${theme.vars["--card"]}) 40%, ${theme.preview} 100%)`, opacity:0.85 }}/>
+                              </div>
+                              <span className="text-[10px] leading-tight font-medium text-center text-foreground/80 line-clamp-2">{theme.emoji} {theme.name.split(" ")[0]}</span>
+                              {isActive && <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-primary shadow-sm"/>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <button onClick={handleCancelPrime} disabled={cancelPrimeLoading}
+                      className="flex items-center gap-2 w-full py-2.5 px-4 rounded-xl border border-destructive/30 text-destructive hover:bg-destructive/5 transition-colors text-sm font-medium disabled:opacity-50">
+                      <X size={15}/> {cancelPrimeLoading ? (lang==="ru"?"Отменяем...":"Cancelling...") : (lang==="ru"?"Отменить Prime подписку":"Cancel Prime subscription")}
+                    </button>
+                  </div>
+                </Section>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-5 shadow-2xl shadow-amber-500/30">
+                    <Crown size={36} className="text-white"/>
+                  </div>
+                  <h3 className="text-2xl font-black mb-2">Pulse Prime</h3>
+                  <p className="text-muted-foreground text-sm mb-6 max-w-xs mx-auto">{lang==="ru"?"Разблокируйте эксклюзивные темы, скрытый статус и другие привилегии.":"Unlock exclusive themes, hidden status, and other perks."}</p>
+                  <a href="/prime" className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-400 to-orange-500 text-white rounded-2xl font-bold shadow-lg hover:opacity-90 transition-opacity">
+                    <Crown size={18}/> {lang==="ru"?"Получить Prime":"Get Prime"}
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── MY STARS ──────────────────────────────────── */}
+          {displaySection === "stars" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <div className="text-center py-8">
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center mx-auto mb-4 shadow-2xl shadow-amber-500/30">
+                  <Star size={36} className="text-white fill-white"/>
+                </div>
+                <h3 className="text-4xl font-black mb-1">{starsBalance}</h3>
+                <p className="text-muted-foreground text-sm mb-6">{lang==="ru"?"Ваши звёзды":"Your Stars"}</p>
+                <div className="flex gap-3 justify-center">
+                  <a href="/prime" className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-yellow-400 to-amber-500 text-white rounded-2xl font-bold text-sm shadow hover:opacity-90 transition-opacity">
+                    <Star size={15}/> {lang==="ru"?"Получить звёзды":"Get Stars"}
+                  </a>
+                  <a href="/gifts" className="inline-flex items-center gap-2 px-5 py-2.5 bg-card border border-border rounded-2xl font-bold text-sm text-foreground hover:bg-secondary transition-colors">
+                    <Gift size={15}/> {lang==="ru"?"Потратить":"Spend"}
+                  </a>
+                </div>
+              </div>
+              <Section title={lang==="ru"?"История транзакций":"Transaction History"} icon={<Star size={13}/>}>
+                <div className="p-8 text-center text-muted-foreground text-sm">
+                  {lang==="ru"?"Транзакций пока нет":"No transactions yet"}
+                </div>
+              </Section>
+              <div className="bg-card border border-border rounded-2xl p-4 space-y-2">
+                <p className="text-sm font-semibold">{lang==="ru"?"Как получить звёзды?":"How to earn Stars?"}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{lang==="ru"?"Звёзды можно получить через Pulse Prime или как подарок от других пользователей. Используйте их для отправки гифтов.":"Stars can be earned through Pulse Prime or as gifts from others. Use them to send gifts and unlock content."}</p>
+              </div>
+            </div>
+          )}
+
+          {/* ─── PULSE FAQ ─────────────────────────────────── */}
+          {displaySection === "faq" && (
+            <div className="max-w-2xl mx-auto space-y-3">
+              {[
+                { q:lang==="ru"?"Как создать группу?":"How to create a group?", a:lang==="ru"?"Нажмите иконку карандаша в списке чатов и выберите «Создать группу».":"Tap the pencil icon in the chat list and select 'Create Group'." },
+                { q:lang==="ru"?"Как включить 2FA?":"How to enable 2FA?", a:lang==="ru"?"Настройки → Конфиденциальность и безопасность → Двухфакторная аутентификация.":"Settings → Privacy & Security → Two-Factor Authentication." },
+                { q:lang==="ru"?"Что такое Pulse Prime?":"What is Pulse Prime?", a:lang==="ru"?"Pulse Prime — платная подписка с эксклюзивными темами, скрытым статусом и другими привилегиями.":"Pulse Prime is a paid subscription with exclusive themes, hidden status, and other perks." },
+                { q:lang==="ru"?"Как удалить аккаунт?":"How to delete account?", a:lang==="ru"?"Свяжитесь с поддержкой через раздел «Поддержка» в настройках.":"Contact support through the 'Support' section in settings." },
+                { q:lang==="ru"?"Как работают стикеры?":"How do stickers work?", a:lang==="ru"?"Нажмите иконку смайлика в поле ввода сообщения для открытия панели стикеров.":"Tap the smile icon in the message input to open the sticker panel." },
+                { q:lang==="ru"?"Как установить PIN-блокировку?":"How to set a screen lock PIN?", a:lang==="ru"?"Настройки → Конфиденциальность → Блокировка экрана.":"Settings → Privacy & Security → Screen Lock." },
+              ].map((item, i) => (
+                <div key={i} className="bg-card border border-border rounded-2xl p-4">
+                  <p className="font-semibold text-sm mb-2">{item.q}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.a}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ─── PULSE FEATURES ────────────────────────────── */}
+          {displaySection === "features" && (
+            <div className="max-w-2xl mx-auto space-y-3">
+              {[
+                { emoji:"💬", title:lang==="ru"?"Чаты":"Chats", desc:lang==="ru"?"Личные, групповые и канальные чаты с историей, ответами, реакциями и поиском":"Direct, group and channel chats with history, replies, reactions and search" },
+                { emoji:"📞", title:lang==="ru"?"Звонки":"Calls", desc:lang==="ru"?"Аудио и видеозвонки с экраном принятия/отклонения и историей":"Audio and video calls with accept/decline screens and call history" },
+                { emoji:"🎁", title:lang==="ru"?"Подарки":"Gifts", desc:lang==="ru"?"Анимированные подарки: обычный, редкий, эпический, легендарный":"Animated gifts with rarities: common, rare, epic, legendary" },
+                { emoji:"📖", title:lang==="ru"?"Истории":"Stories", desc:lang==="ru"?"24-часовые истории с полноэкранным просмотром":"24-hour stories with full-screen viewer" },
+                { emoji:"👥", title:lang==="ru"?"Контакты":"Contacts", desc:lang==="ru"?"Список контактов с поиском и управлением":"Contact list with search and management" },
+                { emoji:"🤖", title:lang==="ru"?"Боты":"Bots", desc:lang==="ru"?"Создавайте ботов с командами и ответами":"Create bots with commands and responses" },
+                { emoji:"🔒", title:lang==="ru"?"Безопасность":"Security", desc:lang==="ru"?"2FA, PIN-блокировка, исчезающие сообщения, приватность":"2FA, PIN lock, disappearing messages, privacy controls" },
+                { emoji:"⭐", title:"Pulse Prime", desc:lang==="ru"?"Эксклюзивные темы, скрытый статус и другие привилегии":"Exclusive themes, hidden online status, and other perks" },
+                { emoji:"🎨", title:lang==="ru"?"Стикеры":"Stickers", desc:lang==="ru"?"Уникальные SVG-стикеры для выражения эмоций":"Unique SVG stickers to express emotions" },
+              ].map((f, i) => (
+                <div key={i} className="bg-card border border-border rounded-2xl p-4 flex items-start gap-4">
+                  <span className="text-3xl shrink-0">{f.emoji}</span>
+                  <div>
+                    <p className="font-semibold text-sm mb-1">{f.title}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ─── SUPPORT ───────────────────────────────────── */}
+          {displaySection === "support" && (
+            <div className="max-w-2xl mx-auto space-y-6">
+              <Section title={t("settings.about")} icon={<Zap size={13}/>}>
+                <div className="p-4">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-orange-700 flex items-center justify-center shrink-0"><Zap size={22} className="text-white fill-white"/></div>
+                    <div>
+                      <p className="font-bold text-base">Pulse Messenger</p>
+                      <p className="text-xs text-muted-foreground">{t("settings.version")}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <div className="bg-muted/50 rounded-xl p-2.5">
+                      <p className="font-medium text-foreground mb-0.5">{t("settings.accountInfo")}</p>
+                      <p>@{user?.username}</p><p>ID: {user?.id}</p>
+                    </div>
+                    <div className="bg-muted/50 rounded-xl p-2.5">
+                      <p className="font-medium text-foreground mb-0.5">{t("settings.statusInfo")}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${currentStatusOpt?.color}`}/>
+                        {currentStatusOpt?.label}
+                      </div>
+                      <p>{user?.isVerified ? t("settings.verified") : t("settings.notVerified")}</p>
+                    </div>
+                  </div>
+                </div>
+              </Section>
+              <div className="bg-card rounded-2xl border border-border overflow-hidden divide-y divide-border">
+                <a href="/support" className="flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors">
+                  <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center shrink-0"><MessageSquare size={14} className="text-primary"/></div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-foreground text-sm">{lang==="ru"?"Служба поддержки":"Support Team"}</p>
+                    <p className="text-xs text-muted-foreground">{lang==="ru"?"Задать вопрос, решить проблему":"Ask a question or report an issue"}</p>
+                  </div>
+                  <ChevronRight size={15} className="text-muted-foreground"/>
+                </a>
+                <a href="/support" className="flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/50 transition-colors">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 flex items-center justify-center shrink-0"><AlertTriangle size={14} className="text-white"/></div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-foreground text-sm">{lang==="ru"?"Сообщить об ошибке":"Report a Bug"}</p>
+                    <p className="text-xs text-muted-foreground">{lang==="ru"?"Помогите нам улучшить Pulse":"Help us improve Pulse"}</p>
+                  </div>
+                  <ChevronRight size={15} className="text-muted-foreground"/>
+                </a>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* ── LOGOUT ALERT DIALOG ── */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("settings.logoutConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("settings.logoutConfirmDesc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={logout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {t("menu.logout")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
             {saved ? <CheckCircle size={16} /> : <Save size={16} />}
             {saved ? t("common.saved") : t("common.save")}
           </button>
