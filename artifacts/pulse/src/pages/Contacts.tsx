@@ -21,17 +21,19 @@ export default function Contacts() {
   const { setSelectedChatId } = useAppContext();
   const [, setLocation] = useLocation();
 
+  const token = sessionStorage.getItem("pulse-token");
+  const authHeader = token ? { "Authorization": `Bearer ${token}` } : {};
+
   const handleAddContact = async (userId: number) => {
     addContact.mutate(
       { data: { userId } },
       {
         onSuccess: async () => {
           queryClient.invalidateQueries({ queryKey: getGetContactsQueryKey() });
-          const uid = sessionStorage.getItem("pulse-user-id");
           try {
             const res = await fetch("/api/chats/direct", {
               method: "POST",
-              headers: { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
+              headers: { "Content-Type": "application/json", ...authHeader },
               body: JSON.stringify({ userId }),
             });
             if (res.ok) {
@@ -51,11 +53,10 @@ export default function Contacts() {
   };
 
   const handleMessage = async (userId: number) => {
-    const uid = sessionStorage.getItem("pulse-user-id");
     try {
       const res = await fetch("/api/chats/direct", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
+        headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ userId }),
       });
       if (res.ok) {
