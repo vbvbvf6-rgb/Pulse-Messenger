@@ -71,16 +71,19 @@ function ChatAvatar({ chat, displayName }: { chat: Chat; displayName: string }) 
     status === "away" ? "bg-yellow-500" : null;
 
   const hasPrime = chat.type === "direct" && (chat.otherUser as any)?.hasPrime;
+  const isPlus   = chat.type === "direct" && (chat.otherUser as any)?.primeTier === "prime_plus";
 
   return (
     <div className="relative shrink-0">
       {hasPrime && (
         <motion.div
           animate={{ rotate: 360 }}
-          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+          transition={{ duration: isPlus ? 3 : 4, repeat: Infinity, ease: "linear" }}
           className="absolute -inset-[2px] rounded-[20px]"
           style={{
-            background: "conic-gradient(from 0deg, #facc15, #fb923c, #f97316, #facc15)",
+            background: isPlus
+              ? "conic-gradient(from 0deg, #a855f7, #38bdf8, #e2e8f0, #c084fc, #06b6d4, #a855f7)"
+              : "conic-gradient(from 0deg, #facc15, #fb923c, #f97316, #facc15)",
             borderRadius: "20px",
           }}
         />
@@ -105,8 +108,12 @@ function ChatAvatar({ chat, displayName }: { chat: Chat; displayName: string }) 
         <span className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-[3px] border-card ${statusDotColor} z-20`} />
       )}
       {hasPrime && (
-        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center z-20 shadow-[0_0_6px_rgba(250,204,21,0.8)]">
-          <Crown size={8} className="text-black" />
+        <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center z-20 ${
+          isPlus
+            ? "bg-gradient-to-br from-purple-500 to-cyan-400 shadow-[0_0_6px_rgba(168,85,247,0.8)]"
+            : "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_6px_rgba(250,204,21,0.8)]"
+        }`}>
+          <Crown size={8} className="text-white" />
         </div>
       )}
     </div>

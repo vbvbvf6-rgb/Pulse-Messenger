@@ -220,7 +220,9 @@ export default function UserProfile() {
               className="h-24 w-full relative"
               style={{
                 background: (user as any).hasPrime
-                  ? "linear-gradient(135deg, rgba(250,204,21,0.25), rgba(251,146,60,0.15), rgba(249,115,22,0.1))"
+                  ? (user as any).primeTier === "prime_plus"
+                    ? "linear-gradient(135deg, rgba(168,85,247,0.25), rgba(56,189,248,0.15), rgba(168,85,247,0.08))"
+                    : "linear-gradient(135deg, rgba(250,204,21,0.25), rgba(251,146,60,0.15), rgba(249,115,22,0.1))"
                   : `linear-gradient(135deg, ${user.avatarColor || "#3B82F6"}66, ${user.avatarColor || "#3B82F6"}22)`,
               }}
             >
@@ -236,7 +238,9 @@ export default function UserProfile() {
                         height: i % 2 === 0 ? 5 : 3,
                         left: `${12 + i * 14}%`,
                         top: `${20 + (i % 3) * 20}%`,
-                        background: i % 2 === 0 ? "#facc15" : "#fb923c",
+                        background: (user as any).primeTier === "prime_plus"
+                          ? (i % 2 === 0 ? "#a855f7" : "#38bdf8")
+                          : (i % 2 === 0 ? "#facc15" : "#fb923c"),
                       }}
                       animate={{ y: [0, -10, 0], opacity: [0.4, 1, 0.4] }}
                       transition={{ duration: 2 + i * 0.4, repeat: Infinity, delay: i * 0.3 }}
@@ -252,10 +256,12 @@ export default function UserProfile() {
                   {(user as any).hasPrime && (
                     <motion.div
                       animate={{ rotate: 360 }}
-                      transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                      transition={{ duration: (user as any).primeTier === "prime_plus" ? 3 : 4, repeat: Infinity, ease: "linear" }}
                       className="absolute -inset-[3px] rounded-full z-0"
                       style={{
-                        background: "conic-gradient(from 0deg, #facc15, #fb923c, #f97316, #facc15)",
+                        background: (user as any).primeTier === "prime_plus"
+                          ? "conic-gradient(from 0deg, #a855f7, #38bdf8, #e2e8f0, #c084fc, #06b6d4, #a855f7)"
+                          : "conic-gradient(from 0deg, #facc15, #fb923c, #f97316, #facc15)",
                         borderRadius: "50%",
                       }}
                     />
@@ -334,7 +340,9 @@ export default function UserProfile() {
                   <h2
                     className="text-2xl font-black"
                     style={(user as any).hasPrime ? {
-                      background: "linear-gradient(90deg, #facc15, #fb923c)",
+                      background: (user as any).primeTier === "prime_plus"
+                        ? "linear-gradient(90deg, #a855f7, #38bdf8)"
+                        : "linear-gradient(90deg, #facc15, #fb923c)",
                       WebkitBackgroundClip: "text",
                       WebkitTextFillColor: "transparent",
                     } : undefined}
@@ -345,9 +353,13 @@ export default function UserProfile() {
                     <motion.div
                       animate={{ rotate: [0, -8, 8, -8, 0], scale: [1, 1.15, 1] }}
                       transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-                      className="w-6 h-6 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center ${
+                        (user as any).primeTier === "prime_plus"
+                          ? "bg-gradient-to-br from-purple-500 to-cyan-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]"
+                          : "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_10px_rgba(250,204,21,0.5)]"
+                      }`}
                     >
-                      <Crown size={13} className="text-black" />
+                      <Crown size={13} className="text-white" />
                     </motion.div>
                   )}
                   {(user as any).isVerified && (

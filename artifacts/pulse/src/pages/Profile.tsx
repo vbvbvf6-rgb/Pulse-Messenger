@@ -41,10 +41,10 @@ export default function Profile() {
             {/* Header Section */}
             <div
               className="flex flex-col items-center text-center p-6 rounded-3xl border border-border bg-card/30 relative overflow-hidden"
-              style={(user as any)?.hasPrime ? { borderColor: "rgba(250,204,21,0.3)" } : undefined}
+              style={(user as any)?.hasPrime ? { borderColor: (user as any)?.primeTier === "prime_plus" ? "rgba(168,85,247,0.3)" : "rgba(250,204,21,0.3)" } : undefined}
             >
               {(user as any)?.hasPrime ? (
-                <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/15 via-orange-500/5 to-transparent" />
+                <div className={`absolute inset-0 bg-gradient-to-b ${(user as any)?.primeTier === "prime_plus" ? "from-purple-500/15 via-cyan-500/5" : "from-yellow-500/15 via-orange-500/5"} to-transparent`} />
               ) : (
                 <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent opacity-50" />
               )}
@@ -60,7 +60,9 @@ export default function Profile() {
                         height: i % 2 === 0 ? 5 : 3,
                         left: `${8 + i * 11}%`,
                         top: `${15 + (i % 4) * 18}%`,
-                        background: i % 2 === 0 ? "#facc15" : "#fb923c",
+                        background: (user as any)?.primeTier === "prime_plus"
+                          ? (i % 2 === 0 ? "#a855f7" : "#38bdf8")
+                          : (i % 2 === 0 ? "#facc15" : "#fb923c"),
                       }}
                       animate={{ y: [0, -12, 0], opacity: [0.3, 0.8, 0.3] }}
                       transition={{ duration: 2.5 + i * 0.4, repeat: Infinity, delay: i * 0.35 }}
@@ -73,10 +75,12 @@ export default function Profile() {
                 {(user as any)?.hasPrime && (
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    transition={{ duration: (user as any)?.primeTier === "prime_plus" ? 3 : 4, repeat: Infinity, ease: "linear" }}
                     className="absolute -inset-[3px] rounded-full"
                     style={{
-                      background: "conic-gradient(from 0deg, #facc15, #fb923c, #f97316, #facc15)",
+                      background: (user as any)?.primeTier === "prime_plus"
+                        ? "conic-gradient(from 0deg, #a855f7, #38bdf8, #e2e8f0, #c084fc, #06b6d4, #a855f7)"
+                        : "conic-gradient(from 0deg, #facc15, #fb923c, #f97316, #facc15)",
                       borderRadius: "50%",
                     }}
                   />
@@ -101,7 +105,9 @@ export default function Profile() {
                 <h2
                   className="text-3xl font-bold text-foreground"
                   style={(user as any)?.hasPrime ? {
-                    background: "linear-gradient(90deg, #facc15, #fb923c)",
+                    background: (user as any)?.primeTier === "prime_plus"
+                      ? "linear-gradient(90deg, #a855f7, #38bdf8)"
+                      : "linear-gradient(90deg, #facc15, #fb923c)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                   } : undefined}
@@ -112,9 +118,13 @@ export default function Profile() {
                   <motion.div
                     animate={{ rotate: [0, -8, 8, -8, 0], scale: [1, 1.15, 1] }}
                     transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
-                    className="w-7 h-7 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-[0_0_12px_rgba(250,204,21,0.6)]"
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                      (user as any)?.primeTier === "prime_plus"
+                        ? "bg-gradient-to-br from-purple-500 to-cyan-400 shadow-[0_0_12px_rgba(168,85,247,0.6)]"
+                        : "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_12px_rgba(250,204,21,0.6)]"
+                    }`}
                   >
-                    <Crown size={14} className="text-black" />
+                    <Crown size={14} className="text-white" />
                   </motion.div>
                 )}
                 {(user as any)?.isVerified && (
@@ -124,7 +134,13 @@ export default function Profile() {
                   </svg>
                 )}
                 {(user as any)?.hasPrime && (
-                  <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">Prime</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+                    (user as any)?.primeTier === "prime_plus"
+                      ? "bg-purple-500/15 text-purple-400 border border-purple-500/30"
+                      : "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30"
+                  }`}>
+                    {(user as any)?.primeTier === "prime_plus" ? "Prime+" : "Prime"}
+                  </span>
                 )}
               </div>
               <p className="text-primary font-medium mb-1 relative z-10">@{user?.username}</p>

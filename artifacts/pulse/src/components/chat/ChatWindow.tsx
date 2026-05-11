@@ -593,6 +593,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const avatarColor = chat.type === "direct" ? (chat.otherUser?.avatarColor || chat.avatarColor || "#333") : (chat.avatarColor || "#333");
   const isVerified = chat.type === "direct" && (chat.otherUser as any)?.isVerified;
   const otherUserHasPrime = chat.type === "direct" && (chat.otherUser as any)?.hasPrime;
+  const otherUserIsPlus   = chat.type === "direct" && (chat.otherUser as any)?.primeTier === "prime_plus";
   const autoDeleteLabel = formatAutoDeleteLabel(autoDeleteTimer);
 
   return (
@@ -612,10 +613,12 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
             {otherUserHasPrime && (
               <motion.div
                 animate={{ rotate: 360 }}
-                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                transition={{ duration: otherUserIsPlus ? 3 : 4, repeat: Infinity, ease: "linear" }}
                 className="absolute -inset-[2px] rounded-[18px]"
                 style={{
-                  background: "conic-gradient(from 0deg, #facc15, #fb923c, #f97316, #facc15)",
+                  background: otherUserIsPlus
+                    ? "conic-gradient(from 0deg, #a855f7, #38bdf8, #e2e8f0, #c084fc, #06b6d4, #a855f7)"
+                    : "conic-gradient(from 0deg, #facc15, #fb923c, #f97316, #facc15)",
                   borderRadius: "18px",
                 }}
               />
@@ -632,8 +635,12 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
               )}
             </button>
             {otherUserHasPrime && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center z-20 shadow-[0_0_6px_rgba(250,204,21,0.8)]">
-                <Crown size={8} className="text-black" />
+              <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center z-20 ${
+                otherUserIsPlus
+                  ? "bg-gradient-to-br from-purple-500 to-cyan-400 shadow-[0_0_6px_rgba(168,85,247,0.8)]"
+                  : "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_6px_rgba(250,204,21,0.8)]"
+              }`}>
+                <Crown size={8} className="text-white" />
               </div>
             )}
           </div>
@@ -645,7 +652,13 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
             <div className="flex items-center gap-1.5">
               <h2 className="font-bold text-base leading-tight truncate group-hover:text-primary transition-colors">{displayName}</h2>
               {otherUserHasPrime && (
-                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 shrink-0">Prime</span>
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
+                  otherUserIsPlus
+                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                    : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                }`}>
+                  {otherUserIsPlus ? "Prime+" : "Prime"}
+                </span>
               )}
               {isVerified && (
                 <svg className="shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none">
