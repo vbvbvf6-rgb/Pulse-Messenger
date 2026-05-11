@@ -356,13 +356,10 @@ export default function UserProfile() {
                       <path d="M7 12l3.5 3.5L17 8" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   )}
-                  {(user as any).hasPrime && (
-                    <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-yellow-500/15 text-yellow-400 border border-yellow-500/30">Prime</span>
-                  )}
-                  {isContact && (
+                  {!(user as any).hasPrime && isContact && (
                     <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">Контакт</span>
                   )}
-                  {isMe && (
+                  {!(user as any).hasPrime && isMe && (
                     <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/30">Вы</span>
                   )}
                 </div>
