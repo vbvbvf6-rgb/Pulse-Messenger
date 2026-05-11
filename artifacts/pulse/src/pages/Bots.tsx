@@ -1463,7 +1463,8 @@ if __name__ == "__main__":
                   {[
                     { name: "text", type: "str", desc: "текст сообщения" },
                     { name: "chat_id", type: "int", desc: "id чата" },
-                    { name: "sender", type: "dict", desc: "{id, username}" },
+                    { name: "sender", type: "dict", desc: "{id, username, first_name}" },
+                    { name: "message", type: "dict", desc: "полный объект Update" },
                   ].map(v => (
                     <span key={v.name} className="flex items-center gap-1.5 text-[11px] font-mono">
                       <span className="text-sky-400">{v.name}</span>

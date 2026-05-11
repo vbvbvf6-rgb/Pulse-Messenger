@@ -256,35 +256,38 @@ chat_id = message.get('chat', {}).get('id', 0)
 sender = message.get('from', {})
 ${inline_code}
 `;
-              const pyReply = await new Promise<string | null>((resolve) => {
-                let out = "";
+              const pyResult = await new Promise<{ out: string; err: string; killed: boolean }>((resolve) => {
+                let out = "", err = "";
                 let killed = false;
                 const py = spawn("python3", ["-c", harness]);
                 const timer = setTimeout(() => {
                   killed = true;
                   py.kill("SIGKILL");
-                  resolve(null);
+                  resolve({ out: "", err: "⏱ Timeout: скрипт выполнялся дольше 10 секунд и был остановлен.", killed: true });
                 }, 10000);
                 py.stdout.on("data", (d: Buffer) => { out += d.toString(); });
+                py.stderr.on("data", (d: Buffer) => { err += d.toString(); });
                 py.on("close", () => {
                   if (!killed) {
                     clearTimeout(timer);
-                    resolve(out.trim() || null);
+                    resolve({ out: out.trim(), err: err.trim(), killed: false });
                   }
                 });
-                py.on("error", () => { clearTimeout(timer); resolve(null); });
+                py.on("error", (e: Error) => { clearTimeout(timer); resolve({ out: "", err: e.message, killed: false }); });
                 try {
                   py.stdin.write(JSON.stringify(payload));
                   py.stdin.end();
                 } catch {}
               });
 
-              if (pyReply) {
+              const replyText = pyResult.out || (pyResult.err ? `🐛 Ошибка в коде бота:\n\`\`\`\n${pyResult.err}\n\`\`\`` : null);
+
+              if (replyText) {
                 await new Promise(r => setTimeout(r, 300 + Math.random() * 500));
                 const [botMsg] = await db.insert(messagesTable).values({
                   chatId: body.chatId,
                   senderId: bot.id,
-                  text: pyReply,
+                  text: replyText,
                   type: "text",
                 }).returning();
                 broadcastToChat(body.chatId, "new-message", { messageId: botMsg.id, chatId: body.chatId });
