@@ -228,6 +228,19 @@ function App() {
   const [userId, setUserId] = useState<number | null>(() => {
     const stored = sessionStorage.getItem("pulse-user-id");
     if (!stored) return null;
+
+    // Detect inherited sessionStorage (tab opened via Ctrl+click / duplicate).
+    // After explicit login or account switch we set "pulse-tab-owned" so the
+    // app knows this tab legitimately owns this session.
+    // If pulse-tab-owned is absent, the session was inherited — clear it so
+    // the tab starts fresh at the login screen.
+    if (!sessionStorage.getItem("pulse-tab-owned")) {
+      sessionStorage.removeItem("pulse-user-id");
+      sessionStorage.removeItem("pulse-user");
+      sessionStorage.removeItem("pulse-token");
+      return null;
+    }
+
     const id = Number(stored);
     const accounts = getSavedAccounts();
     if (!accounts.some(a => a.userId === id)) {
@@ -253,13 +266,16 @@ function App() {
 
   const handleLogin = (id: number) => {
     const user = (() => { try { return JSON.parse(sessionStorage.getItem("pulse-user") || "{}"); } catch { return {}; } })();
+    const token = sessionStorage.getItem("pulse-token");
     saveAccount({
       userId: id,
       displayName: user.displayName || "User",
       username: user.username || "",
       avatarUrl: user.avatarUrl || null,
       avatarColor: user.avatarColor || "#3B82F6",
+      token: token || undefined,
     });
+    sessionStorage.setItem("pulse-tab-owned", "1");
     persistAndSwitch(id);
   };
 
@@ -280,6 +296,7 @@ function App() {
       avatarUrl: acc.avatarUrl,
       avatarColor: acc.avatarColor,
     }));
+    sessionStorage.setItem("pulse-tab-owned", "1");
     persistAndSwitch(id);
   };
 
@@ -293,6 +310,7 @@ function App() {
         sessionStorage.removeItem("pulse-user-id");
         sessionStorage.removeItem("pulse-user");
         sessionStorage.removeItem("pulse-token");
+        sessionStorage.removeItem("pulse-tab-owned");
         queryClient.clear();
         setUserId(null);
       }
@@ -305,29 +323,14 @@ function App() {
     sessionStorage.removeItem("pulse-user-id");
     sessionStorage.removeItem("pulse-user");
     sessionStorage.removeItem("pulse-token");
-    const remaining = getSavedAccounts();
-    if (remaining.length > 0) {
-      const acc = remaining[0];
-      if (acc.token) {
-        sessionStorage.setItem("pulse-token", acc.token);
-      }
-      sessionStorage.setItem("pulse-user-id", String(acc.userId));
-      sessionStorage.setItem("pulse-user", JSON.stringify({
-        id: acc.userId,
-        displayName: acc.displayName,
-        username: acc.username,
-        avatarUrl: acc.avatarUrl,
-        avatarColor: acc.avatarColor,
-      }));
-      persistAndSwitch(acc.userId);
-    } else {
-      queryClient.clear();
-      setUserId(null);
-    }
+    sessionStorage.removeItem("pulse-tab-owned");
+    queryClient.clear();
+    setUserId(null);
   };
 
   const handleAccountAdded = (id: number) => {
     setAddingAccount(false);
+    sessionStorage.setItem("pulse-tab-owned", "1");
     persistAndSwitch(id);
   };
 
