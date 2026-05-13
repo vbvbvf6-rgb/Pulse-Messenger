@@ -318,6 +318,7 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
     return true;
   });
 
+  const [lightbox, setLightbox] = useState<{ urls: string[]; idx: number } | null>(null);
   const [displayedWords, setDisplayedWords] = useState<number>(typingOut ? 0 : Infinity);
   const typingDoneRef = useRef(false);
 
@@ -615,12 +616,51 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
             <img
               src={message.mediaUrl || ""}
               alt="photo"
-              className="max-w-[280px] max-h-[320px] object-cover block w-full"
+              className="max-w-[280px] max-h-[320px] object-cover block w-full cursor-zoom-in"
+              onClick={() => setLightbox({ urls: [message.mediaUrl || ""], idx: 0 })}
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
             {message.text && <p className="text-[15px] mt-3 px-2 mb-1 font-medium">{message.text}</p>}
           </div>
         );
+      case "album": {
+        let albumUrls: string[] = [];
+        let albumCaption = "";
+        try {
+          const parsed = JSON.parse(message.text || "{}");
+          albumUrls = parsed.urls || [];
+          albumCaption = parsed.caption || "";
+        } catch { albumUrls = [message.mediaUrl || ""]; }
+        const visibleCount = Math.min(albumUrls.length, 4);
+        const extra = albumUrls.length - 4;
+        return (
+          <div className="rounded-xl overflow-hidden -mx-1 -mt-1 mb-1">
+            <div className={`grid gap-0.5 ${visibleCount === 1 ? "grid-cols-1" : visibleCount === 2 ? "grid-cols-2" : visibleCount >= 3 ? "grid-cols-2" : "grid-cols-2"}`}>
+              {albumUrls.slice(0, 4).map((url, i) => (
+                <div key={i} className="relative overflow-hidden" style={{ aspectRatio: visibleCount === 1 ? "4/3" : "1/1" }}>
+                  <img
+                    src={url}
+                    alt={`photo ${i + 1}`}
+                    className="w-full h-full object-cover cursor-zoom-in block"
+                    style={{ maxHeight: visibleCount === 1 ? 280 : 140 }}
+                    onClick={() => setLightbox({ urls: albumUrls, idx: i })}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                  {i === 3 && extra > 0 && (
+                    <div
+                      className="absolute inset-0 bg-black/60 flex items-center justify-center cursor-zoom-in"
+                      onClick={() => setLightbox({ urls: albumUrls, idx: 3 })}
+                    >
+                      <span className="text-white text-2xl font-black">+{extra}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            {albumCaption && <p className="text-[15px] mt-3 px-2 mb-1 font-medium">{albumCaption}</p>}
+          </div>
+        );
+      }
       case "audio": {
         const durSec = parseInt((message.text || "voice:0").replace("voice:", "")) || 0;
         return <VoicePlayer src={message.mediaUrl || ""} durationSec={durSec} isMine={isMine} />;
@@ -917,6 +957,61 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AnimatePresence>
+        {lightbox && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center"
+            onClick={() => setLightbox(null)}
+          >
+            <button
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+              onClick={() => setLightbox(null)}
+            >
+              <X size={20} />
+            </button>
+
+            {lightbox.urls.length > 1 && (
+              <>
+                <button
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+                  onClick={(e) => { e.stopPropagation(); setLightbox(l => l ? { ...l, idx: Math.max(0, l.idx - 1) } : null); }}
+                  disabled={lightbox.idx === 0}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+                  onClick={(e) => { e.stopPropagation(); setLightbox(l => l ? { ...l, idx: Math.min(l.urls.length - 1, l.idx + 1) } : null); }}
+                  disabled={lightbox.idx === lightbox.urls.length - 1}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                  {lightbox.urls.map((_, i) => (
+                    <div key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === lightbox.idx ? "bg-white" : "bg-white/40"}`} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            <motion.img
+              key={lightbox.idx}
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              src={lightbox.urls[lightbox.idx]}
+              alt="photo"
+              className="max-w-[95vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

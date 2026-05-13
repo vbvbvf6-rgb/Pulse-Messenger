@@ -97,6 +97,14 @@ router.delete("/admin/users/:userId", requireAdmin, async (req, res) => {
     const target = await db.query.usersTable.findFirst({ where: eq(usersTable.id, targetId) });
     if (!target) return res.status(404).json({ error: "Пользователь не найден" });
 
+    // Delete in FK-safe order: leaf tables first, then parent tables
+    await db.execute(sql`DELETE FROM reactions WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM poll_votes WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM spark_activity WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM pinned_messages WHERE pinned_by = ${targetId}`);
+    await db.execute(sql`DELETE FROM push_subscriptions WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM bug_reports WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM scheduled_messages WHERE sender_id = ${targetId}`);
     await db.execute(sql`DELETE FROM contacts WHERE user_id = ${targetId} OR contact_id = ${targetId}`);
     await db.execute(sql`DELETE FROM story_views WHERE viewer_id = ${targetId}`);
     await db.execute(sql`DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE user_id = ${targetId})`);
@@ -104,13 +112,20 @@ router.delete("/admin/users/:userId", requireAdmin, async (req, res) => {
     await db.execute(sql`DELETE FROM chat_members WHERE user_id = ${targetId}`);
     await db.execute(sql`UPDATE messages SET sender_id = NULL WHERE sender_id = ${targetId}`);
     await db.execute(sql`DELETE FROM gifts WHERE sender_id = ${targetId} OR receiver_id = ${targetId}`);
-    await db.execute(sql`UPDATE calls SET caller_id = ${targetId} WHERE caller_id = ${targetId}`);
+    await db.execute(sql`UPDATE calls SET caller_id = NULL WHERE caller_id = ${targetId}`);
+    await db.execute(sql`UPDATE calls SET callee_id = NULL WHERE callee_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM post_likes WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM post_comments WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM moderation_appeals WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM posts WHERE user_id = ${targetId}`);
+    await db.execute(sql`DELETE FROM support_messages WHERE ticket_id IN (SELECT id FROM support_tickets WHERE user_id = ${targetId})`);
+    await db.execute(sql`DELETE FROM support_tickets WHERE user_id = ${targetId}`);
     await db.execute(sql`DELETE FROM users WHERE id = ${targetId}`);
 
     res.json({ success: true, message: `Пользователь @${target.username} удалён` });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Ошибка сервера" });
+    res.status(500).json({ error: "Ошибка удаления: " + (err as Error).message });
   }
 });
 

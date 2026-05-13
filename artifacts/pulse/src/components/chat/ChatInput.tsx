@@ -46,7 +46,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-async function compressImage(file: File, maxPx = 1280, quality = 0.82): Promise<string> {
+async function compressImage(file: File, maxPx = 960, quality = 0.75): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -267,13 +267,28 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
         setAudioBlob(null);
         setRecordSeconds(0);
       } else if (imagePreviews.length > 0) {
-        for (let i = 0; i < imagePreviews.length; i++) {
+        if (imagePreviews.length >= 2) {
+          const token = sessionStorage.getItem("pulse-token");
+          const hdrs: Record<string, string> = { "Content-Type": "application/json" };
+          if (token) hdrs["Authorization"] = `Bearer ${token}`;
+          await fetch("/api/messages", {
+            method: "POST",
+            headers: hdrs,
+            body: JSON.stringify({
+              chatId,
+              type: "album",
+              mediaUrl: imagePreviews[0],
+              text: JSON.stringify({ urls: imagePreviews, caption: text.trim() }),
+              replyToId: replyTo?.id,
+            }),
+          });
+        } else {
           await sendMessage.mutateAsync({
             data: {
               chatId,
               type: "image",
-              mediaUrl: imagePreviews[i],
-              text: i === imagePreviews.length - 1 && text.trim() ? text.trim() : undefined,
+              mediaUrl: imagePreviews[0],
+              text: text.trim() || undefined,
               replyToId: replyTo?.id,
             }
           });
