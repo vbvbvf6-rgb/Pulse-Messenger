@@ -22,7 +22,7 @@ export default function Contacts() {
   const [, setLocation] = useLocation();
 
   const token = sessionStorage.getItem("pulse-token");
-  const authHeader = token ? { "Authorization": `Bearer ${token}` } : {};
+  const authHeader: Record<string, string> = token ? { "Authorization": `Bearer ${token}` } : {};
 
   const handleAddContact = async (userId: number) => {
     addContact.mutate(

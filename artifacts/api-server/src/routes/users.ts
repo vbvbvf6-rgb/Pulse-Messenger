@@ -146,121 +146,6 @@ router.get("/users/:userId", async (req, res) => {
   }
 });
 
-router.get("/wallet", async (req, res) => {
-  try {
-    const uid = req.currentUserId;
-    const rows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const balance = rows.rows[0] ? Number((rows.rows[0] as any).balance) : 0;
-    const address = `PULSE-${uid.toString().padStart(6, "0")}`;
-    res.json({ balance, address, currency: "SPARK", symbol: "⚡" });
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-router.post("/wallet/earn", async (req, res) => {
-  try {
-    const uid = req.currentUserId;
-    const amount = Number(req.body.amount);
-    if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid amount" });
-    await db.execute(sql`UPDATE users SET balance = balance + ${amount} WHERE id = ${uid}`);
-    const rows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const balance = Number((rows.rows[0] as any).balance);
-    res.json({ balance });
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-router.post("/wallet/spend", async (req, res) => {
-  try {
-    const uid = req.currentUserId;
-    const amount = Number(req.body.amount);
-    if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid amount" });
-    const rows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const balance = Number((rows.rows[0] as any).balance);
-    if (balance < amount) {
-      return res.status(400).json({ error: "Недостаточно средств", balance });
-    }
-    await db.execute(sql`UPDATE users SET balance = balance - ${amount} WHERE id = ${uid}`);
-    const result = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const newBalance = Number((result.rows[0] as any).balance);
-    res.json({ balance: newBalance });
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-router.post("/prime/subscribe", async (req, res) => {
-  try {
-    const uid = req.currentUserId;
-    const { planId, tier } = req.body;
-    const primeTier: string = tier === "prime_plus" ? "prime_plus" : "prime";
-
-    const PLAN_COSTS: Record<string, Record<string, { cost: number; months: number }>> = {
-      prime: {
-        monthly:  { cost: 499,  months: 1  },
-        halfyear: { cost: 1974, months: 6  },
-        yearly:   { cost: 2988, months: 12 },
-      },
-      prime_plus: {
-        monthly:  { cost: 899,  months: 1  },
-        halfyear: { cost: 3594, months: 6  },
-        yearly:   { cost: 5388, months: 12 },
-      },
-    };
-
-    const plan = PLAN_COSTS[primeTier]?.[planId];
-    if (!plan) return res.status(400).json({ error: "Неверный план" });
-
-    const rows = await db.execute(sql`SELECT balance, has_prime, prime_tier, prime_expires_at FROM users WHERE id = ${uid}`);
-    const user = rows.rows[0] as any;
-    if (!user) return res.status(404).json({ error: "Пользователь не найден" });
-
-    const balance = Number(user.balance ?? 0);
-    if (balance < plan.cost) {
-      return res.status(400).json({ error: `Недостаточно Spark. Нужно ${plan.cost} ⚡, у вас ${balance} ⚡.`, balance });
-    }
-
-    const now = new Date();
-    let expiresAt: Date;
-    if (user.has_prime && user.prime_expires_at && new Date(user.prime_expires_at) > now) {
-      expiresAt = new Date(user.prime_expires_at);
-    } else {
-      expiresAt = new Date(now);
-    }
-    expiresAt.setMonth(expiresAt.getMonth() + plan.months);
-
-    const bonusSpark = primeTier === "prime_plus" ? 100 : 50;
-
-    await db.execute(
-      sql`UPDATE users SET balance = balance - ${plan.cost} + ${bonusSpark}, has_prime = true, prime_tier = ${primeTier}, prime_expires_at = ${expiresAt.toISOString()} WHERE id = ${uid}`
-    );
-
-    const updated = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const newBalance = Number((updated.rows[0] as any).balance ?? 0);
-
-    res.json({ success: true, hasPrime: true, primeTier, primeExpiresAt: expiresAt.toISOString(), balance: newBalance });
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-router.post("/prime/cancel", async (req, res) => {
-  try {
-    const uid = req.currentUserId;
-    await db.execute(sql`UPDATE users SET has_prime = false, prime_expires_at = NULL WHERE id = ${uid}`);
-    res.json({ success: true });
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
 router.get("/stats/me", async (req, res) => {
   try {
     const uid = req.currentUserId;
@@ -275,6 +160,9 @@ router.get("/stats/me", async (req, res) => {
     const [chatsCount] = await db.select({ count: count() }).from(chatMembersTable).where(eq(chatMembersTable.userId, uid));
     const [contactsCount] = await db.select({ count: count() }).from(contactsTable).where(eq(contactsTable.userId, uid));
 
+    const balanceRow = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
+    const balance = Number((balanceRow.rows[0] as any)?.balance ?? 0);
+
     res.json({
       messagesSent: Number(msgCount?.count ?? 0),
       callsMade: Number(callCount?.count ?? 0),
@@ -283,6 +171,7 @@ router.get("/stats/me", async (req, res) => {
       giftsReceived: Number(giftsReceived?.count ?? 0),
       chatsCount: Number(chatsCount?.count ?? 0),
       contactsCount: Number(contactsCount?.count ?? 0),
+      popularity: Math.min(balance, 10000),
     });
   } catch (err) {
     req.log.error(err);

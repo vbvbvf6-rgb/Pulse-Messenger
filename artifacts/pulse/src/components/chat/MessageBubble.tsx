@@ -319,13 +319,14 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
   });
 
   useEffect(() => {
-    if (!isMine) return;
+    if (!isMine) return undefined;
     const age = Date.now() - new Date(message.createdAt).getTime();
     const remaining = 3500 - age;
     if (remaining > 0) {
       const t = setTimeout(() => setIsPending(false), remaining);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [message.createdAt, isMine]);
 
   // Play effect if message is recent (within 20s) and effect hasn't played yet this session
@@ -665,7 +666,7 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
   }
 
   const renderContent = () => {
-    switch (message.type) {
+    switch (message.type as string) {
       case "poll":
         return <PollDisplay pollData={pollData} messageId={message.id} chatId={message.chatId} currentUserId={currentUserId} isMine={isMine} />;
       case "text": {

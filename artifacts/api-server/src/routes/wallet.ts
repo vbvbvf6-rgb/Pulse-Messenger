@@ -35,6 +35,29 @@ router.post("/wallet/earn", async (req, res) => {
   }
 });
 
+router.post("/wallet/spend", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const { amount } = req.body;
+    if (typeof amount !== "number" || amount <= 0) {
+      return res.status(400).json({ error: "Некорректная сумма" });
+    }
+    const rows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
+    const balance = Number((rows.rows[0] as any)?.balance ?? 0);
+    if (balance < amount) {
+      return res.status(400).json({ error: `Недостаточно Spark. Ваш баланс: ${balance} ⚡`, balance });
+    }
+    await db.execute(sql`UPDATE users SET balance = balance - ${amount} WHERE id = ${uid}`);
+    await db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${uid}, 'spent', ${-amount}, 'Покупка') ON CONFLICT DO NOTHING`).catch(() => {});
+    const updated = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
+    const newBalance = Number((updated.rows[0] as any)?.balance ?? 0);
+    res.json({ success: true, balance: newBalance });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 router.post("/wallet/send", async (req, res) => {
   try {
     const uid = req.currentUserId;
@@ -241,34 +264,6 @@ router.get("/wallet/activity", async (req, res) => {
     res.json({
       activities: rows.rows,
       summary: summary.rows[0] ?? { total_earned: 0, total_spent: 0, total_transactions: 0 },
-    });
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Ошибка сервера" });
-  }
-});
-
-router.get("/stats/me", async (req, res) => {
-  try {
-    const uid = req.currentUserId;
-    const [msgs, calls, giftsS, giftsR, contacts] = await Promise.all([
-      db.execute(sql`SELECT COUNT(*) as cnt FROM messages WHERE sender_id = ${uid}`),
-      db.execute(sql`SELECT COUNT(*) as cnt FROM calls WHERE caller_id = ${uid}`),
-      db.execute(sql`SELECT COUNT(*) as cnt FROM gifts WHERE sender_id = ${uid}`).catch(() => ({ rows: [{ cnt: 0 }] })),
-      db.execute(sql`SELECT COUNT(*) as cnt FROM gifts WHERE receiver_id = ${uid}`).catch(() => ({ rows: [{ cnt: 0 }] })),
-      db.execute(sql`SELECT COUNT(*) as cnt FROM contacts WHERE user_id = ${uid}`).catch(() => ({ rows: [{ cnt: 0 }] })),
-    ]);
-
-    const popularityRow = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const balance = Number((popularityRow.rows[0] as any)?.balance ?? 0);
-
-    res.json({
-      messagesSent: Number((msgs.rows[0] as any)?.cnt ?? 0),
-      callsMade: Number((calls.rows[0] as any)?.cnt ?? 0),
-      giftsSent: Number((giftsS.rows[0] as any)?.cnt ?? 0),
-      giftsReceived: Number((giftsR.rows[0] as any)?.cnt ?? 0),
-      contactsCount: Number((contacts.rows[0] as any)?.cnt ?? 0),
-      popularity: Math.min(balance, 10000),
     });
   } catch (err) {
     req.log.error(err);

@@ -243,4 +243,20 @@ router.post("/prime/gift", async (req, res) => {
   }
 });
 
+router.post("/prime/cancel", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const rows = await db.execute(sql`SELECT has_prime FROM users WHERE id = ${uid}`);
+    const user = rows.rows[0] as any;
+    if (!user) return res.status(404).json({ error: "Пользователь не найден" });
+    if (!user.has_prime) return res.status(400).json({ error: "У вас нет активной подписки" });
+    await db.execute(sql`UPDATE users SET has_prime = false, prime_tier = NULL, prime_expires_at = NULL WHERE id = ${uid}`);
+    await db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${uid}, 'subscription_cancel', 0, 'Отмена подписки Prime')`).catch(() => {});
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
 export default router;

@@ -48,6 +48,8 @@ const translations = {
     "settings.avatarUrl": "URL аватара",
     "settings.avatarColor": "Цвет аватара",
     "settings.name": "Имя",
+    "settings.displayName": "Имя в чате",
+    "settings.displayNamePlaceholder": "Введите имя",
     "settings.username": "Никнейм",
     "settings.bio": "О себе",
     "settings.bioPlaceholder": "Расскажите о себе...",
@@ -186,6 +188,7 @@ const translations = {
     "autodelete.cleared": "Автоудаление отключено",
     "autodelete.desc": "Новые сообщения будут удалены через выбранное время",
     "autodelete.globalDefault": "Автоудаление по умолчанию",
+    "autodelete.globalDefaultDesc": "Применяется ко всем новым чатам",
     "autodelete.globalDesc": "Применяется к новым чатам",
 
     // Chat
@@ -272,6 +275,8 @@ const translations = {
     "settings.avatarUrl": "Avatar URL",
     "settings.avatarColor": "Avatar Color",
     "settings.name": "Name",
+    "settings.displayName": "Display Name",
+    "settings.displayNamePlaceholder": "Enter name",
     "settings.username": "Username",
     "settings.bio": "Bio",
     "settings.bioPlaceholder": "Tell us about yourself...",
@@ -410,6 +415,7 @@ const translations = {
     "autodelete.cleared": "Auto-delete disabled",
     "autodelete.desc": "New messages will be deleted after the selected time",
     "autodelete.globalDefault": "Default auto-delete",
+    "autodelete.globalDefaultDesc": "Applied to all new chats",
     "autodelete.globalDesc": "Applied to new chats",
 
     // Chat

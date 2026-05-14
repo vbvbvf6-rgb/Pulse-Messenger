@@ -791,6 +791,7 @@ export default function Settings() {
       setAvatarUrl(compressed);
       // Auto-save avatar immediately
       const uid = sessionStorage.getItem("pulse-user-id");
+      const token = sessionStorage.getItem("pulse-token");
       fetch("/api/users/me", {
         method: "PUT",
         headers: {
@@ -962,6 +963,7 @@ export default function Settings() {
     setPwLoading(true);
     try {
       const uid = sessionStorage.getItem("pulse-user-id");
+      const token = sessionStorage.getItem("pulse-token");
       const res = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
@@ -1040,6 +1042,7 @@ export default function Settings() {
     setUsernameError("");
     try {
       const uid = sessionStorage.getItem("pulse-user-id");
+      const token = sessionStorage.getItem("pulse-token");
       const res = await fetch("/api/users/me/username", {
         method: "PUT",
         headers: { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
