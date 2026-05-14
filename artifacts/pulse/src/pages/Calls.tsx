@@ -46,7 +46,7 @@ export default function Calls() {
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
       {/* Header */}
-      <header className="h-16 border-b border-border flex items-center px-5 justify-between bg-card/60 backdrop-blur-xl z-10 shrink-0">
+      <header className="h-16 border-b border-border flex items-center px-6 justify-between bg-card/80 backdrop-blur-xl z-10 shrink-0">
         <h1 className="text-xl font-bold tracking-tight">Звонки</h1>
         <button
           onClick={() => setShowNewCall(true)}
@@ -58,7 +58,7 @@ export default function Calls() {
       </header>
 
       {/* Tabs */}
-      <div className="flex gap-1 px-5 py-3 shrink-0 border-b border-border bg-card/30 overflow-x-auto scrollbar-none">
+      <div className="flex gap-1 px-6 py-3 shrink-0 border-b border-border bg-card/30 overflow-x-auto scrollbar-none">
         {tabs.map((tab) => (
           <button
             key={tab.id}

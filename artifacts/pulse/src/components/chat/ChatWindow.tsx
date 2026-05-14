@@ -614,7 +614,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden z-30">
       {/* Header */}
-      <header className="h-[72px] border-b border-border flex items-center px-4 justify-between bg-card z-20 shrink-0 shadow-[0_4px_24px_rgba(0,0,0,0.04)] relative">
+      <header className="h-16 border-b border-border flex items-center px-6 justify-between bg-card z-20 shrink-0 shadow-[0_1px_0_0_hsl(var(--border))] relative">
         <div className="flex items-center gap-3 min-w-0">
           <button
             className="flex items-center justify-center w-11 h-11 -ml-2 rounded-2xl bg-secondary hover:bg-secondary/80 text-foreground transition-colors shrink-0 md:hidden"

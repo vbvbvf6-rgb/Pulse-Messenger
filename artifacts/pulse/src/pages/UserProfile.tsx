@@ -135,7 +135,7 @@ export default function UserProfile() {
   if (isLoading) {
     return (
       <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
-        <header className="h-16 border-b border-border flex items-center px-4 gap-3 bg-card/80 backdrop-blur-md shrink-0">
+        <header className="h-16 border-b border-border flex items-center px-6 gap-3 bg-card/80 backdrop-blur-md shrink-0">
           <button onClick={() => window.history.back()} className="p-2 rounded-full hover:bg-secondary text-muted-foreground transition-colors">
             <ArrowLeft size={20} />
           </button>
@@ -167,7 +167,7 @@ export default function UserProfile() {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
-      <header className="h-16 border-b border-border flex items-center px-4 gap-3 bg-card/80 backdrop-blur-md shrink-0 z-10">
+      <header className="h-16 border-b border-border flex items-center px-6 gap-3 bg-card/80 backdrop-blur-md shrink-0 z-10">
         <button
           onClick={() => window.history.back()}
           className="p-2 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"

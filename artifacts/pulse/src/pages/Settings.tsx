@@ -1156,7 +1156,7 @@ export default function Settings() {
         activeSection === null ? "flex w-full" : "hidden"
       )}>
         {/* Sidebar header */}
-        <div className="h-16 border-b border-border flex items-center px-5 bg-card/80 backdrop-blur-md shrink-0">
+        <div className="h-16 border-b border-border flex items-center px-6 bg-card/80 backdrop-blur-md shrink-0">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <SettingsIcon size={20} className="text-primary" /> {t("settings.title")}
           </h1>
@@ -1166,7 +1166,7 @@ export default function Settings() {
         <button
           onClick={() => setActiveSection("account")}
           className={cn(
-            "flex items-center gap-4 px-5 py-4 w-full text-left transition-colors border-b border-border",
+            "flex items-center gap-4 px-6 py-4 w-full text-left transition-colors border-b border-border",
             displaySection === "account" ? "bg-primary/5" : "hover:bg-secondary"
           )}
         >
@@ -1254,7 +1254,7 @@ export default function Settings() {
       )}>
 
         {/* Content header */}
-        <header className="h-16 border-b border-border flex items-center px-5 gap-3 bg-card/80 backdrop-blur-md shrink-0">
+        <header className="h-16 border-b border-border flex items-center px-6 gap-3 bg-card/80 backdrop-blur-md shrink-0">
           <button
             onClick={() => setActiveSection(null)}
             className="md:hidden w-9 h-9 rounded-xl hover:bg-secondary flex items-center justify-center text-muted-foreground transition-colors shrink-0"

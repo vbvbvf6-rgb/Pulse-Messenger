@@ -340,7 +340,7 @@ export function ChatList() {
           <GlobalSearch onClose={() => setShowGlobalSearch(false)} />
         )}
       </AnimatePresence>
-      <div className="px-5 pb-4" style={{ paddingTop: "max(20px, env(safe-area-inset-top, 20px))" }}>
+      <div className="px-4 pb-3" style={{ paddingTop: "max(16px, env(safe-area-inset-top, 16px))" }}>
         <div className="flex items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground w-5 h-5" />
@@ -359,7 +359,7 @@ export function ChatList() {
           </button>
         </div>
 
-        <div className="flex gap-2 mt-5 overflow-x-auto scrollbar-none pb-1">
+        <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-none pb-1">
           {FOLDERS.map(f => {
             const isActive = folder === f.key;
             const count = f.key === "unread" && chats ? chats.filter((c: Chat) => (c.unreadCount ?? 0) > 0).length : 0;
