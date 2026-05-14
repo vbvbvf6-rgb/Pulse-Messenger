@@ -60,6 +60,7 @@ const PUBLIC_API_PATHS = [
   "/auth/2fa/complete",
   "/auth/security-question",
   "/auth/reset-password",
+  "/auth/qr",
   "/health",
 ];
 

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck, QrCode, RefreshCw, CheckCircle2, Clock } from "lucide-react";
 import PulseLogo from "@/components/PulseLogo";
 
 interface LoginProps {
@@ -15,11 +15,76 @@ export default function Login({ onLogin }: LoginProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [step, setStep] = useState<"credentials" | "2fa">("credentials");
+  const [step, setStep] = useState<"credentials" | "2fa" | "qr">("credentials");
   const [twoFaCode, setTwoFaCode] = useState("");
   const [pendingToken, setPendingToken] = useState("");
   const [twoFaLoading, setTwoFaLoading] = useState(false);
   const [twoFaError, setTwoFaError] = useState("");
+
+  const [qrTokenId, setQrTokenId] = useState<string | null>(null);
+  const [qrExpiresAt, setQrExpiresAt] = useState<number>(0);
+  const [qrStatus, setQrStatus] = useState<"idle" | "pending" | "confirmed" | "expired">("idle");
+  const [qrTimeLeft, setQrTimeLeft] = useState<number>(300);
+  const qrPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const qrTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearQrIntervals = () => {
+    if (qrPollRef.current) { clearInterval(qrPollRef.current); qrPollRef.current = null; }
+    if (qrTimerRef.current) { clearInterval(qrTimerRef.current); qrTimerRef.current = null; }
+  };
+
+  useEffect(() => {
+    return () => clearQrIntervals();
+  }, []);
+
+  const startQrLogin = async () => {
+    clearQrIntervals();
+    setQrStatus("pending");
+    setError("");
+    try {
+      const res = await fetch("/api/auth/qr/generate", { method: "POST" });
+      const data = await res.json();
+      setQrTokenId(data.tokenId);
+      setQrExpiresAt(data.expiresAt);
+      const timeLeft = Math.max(0, Math.floor((data.expiresAt - Date.now()) / 1000));
+      setQrTimeLeft(timeLeft);
+
+      qrTimerRef.current = setInterval(() => {
+        setQrTimeLeft(prev => {
+          if (prev <= 1) {
+            clearQrIntervals();
+            setQrStatus("expired");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      qrPollRef.current = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/auth/qr/${data.tokenId}`);
+          const d = await r.json();
+          if (d.status === "confirmed") {
+            clearQrIntervals();
+            setQrStatus("confirmed");
+            if (d.token) sessionStorage.setItem("pulse-token", d.token);
+            sessionStorage.setItem("pulse-user-id", String(d.userId));
+            sessionStorage.setItem("pulse-user", JSON.stringify(d.user));
+            sessionStorage.setItem("pulse-tab-owned", "1");
+            onLogin(d.userId);
+          } else if (d.status === "expired") {
+            clearQrIntervals();
+            setQrStatus("expired");
+          }
+        } catch {}
+      }, 2000);
+
+      setStep("qr");
+    } catch {
+      setQrStatus("idle");
+      setError("Не удалось создать QR-код");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +113,7 @@ export default function Login({ onLogin }: LoginProps) {
       if (data.token) sessionStorage.setItem("pulse-token", data.token);
       sessionStorage.setItem("pulse-user-id", String(data.userId));
       sessionStorage.setItem("pulse-user", JSON.stringify(data.user));
+      sessionStorage.setItem("pulse-tab-owned", "1");
       onLogin(data.userId);
     } catch {
       setError("Ошибка подключения к серверу");
@@ -79,6 +145,7 @@ export default function Login({ onLogin }: LoginProps) {
       if (data.token) sessionStorage.setItem("pulse-token", data.token);
       sessionStorage.setItem("pulse-user-id", String(data.userId));
       sessionStorage.setItem("pulse-user", JSON.stringify(data.user));
+      sessionStorage.setItem("pulse-tab-owned", "1");
       onLogin(data.userId);
     } catch {
       setTwoFaError("Ошибка подключения к серверу");
@@ -87,9 +154,37 @@ export default function Login({ onLogin }: LoginProps) {
     }
   };
 
+  const getStepIcon = () => {
+    if (step === "2fa") return <ShieldCheck className="text-primary w-10 h-10" />;
+    if (step === "qr") return <QrCode className="text-primary w-10 h-10" />;
+    return <PulseLogo size={48} />;
+  };
+
+  const getStepTitle = () => {
+    if (step === "2fa") return "Верификация";
+    if (step === "qr") return "QR вход";
+    return "Pulse";
+  };
+
+  const getStepSubtitle = () => {
+    if (step === "2fa") return "Введите код из приложения";
+    if (step === "qr") return "Отсканируйте с другого устройства";
+    return "С возвращением";
+  };
+
+  const qrUrl = qrTokenId ? `${window.location.origin}/qr/${qrTokenId}` : "";
+  const qrImageUrl = qrUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&format=svg&color=FF6600&bgcolor=00000000&data=${encodeURIComponent(qrUrl)}`
+    : "";
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Static background orbs — no animation to keep performance smooth */}
       <div
         className="absolute top-[-15%] left-[-10%] w-[55%] h-[55%] rounded-full blur-[120px] opacity-40 pointer-events-none"
         style={{ background: "radial-gradient(circle, hsl(16 100% 50% / 0.18), transparent 70%)" }}
@@ -105,7 +200,6 @@ export default function Login({ onLogin }: LoginProps) {
         transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-[380px] relative z-10"
       >
-        {/* Logo + title */}
         <div className="flex flex-col items-center mb-10">
           <motion.div
             initial={{ scale: 0.7, opacity: 0, rotate: -10 }}
@@ -118,11 +212,7 @@ export default function Login({ onLogin }: LoginProps) {
               boxShadow: "0 0 40px hsl(16 100% 50% / 0.15), inset 0 1px 0 rgba(255,255,255,0.06)",
             }}
           >
-            {step === "2fa" ? (
-              <ShieldCheck className="text-primary w-10 h-10" />
-            ) : (
-              <PulseLogo size={48} />
-            )}
+            {getStepIcon()}
           </motion.div>
 
           <motion.div
@@ -132,15 +222,14 @@ export default function Login({ onLogin }: LoginProps) {
             className="text-center"
           >
             <h1 className="text-4xl font-black text-foreground tracking-tight leading-none mb-2">
-              {step === "2fa" ? "Верификация" : "Pulse"}
+              {getStepTitle()}
             </h1>
             <p className="text-muted-foreground text-[15px] font-medium">
-              {step === "2fa" ? "Введите код из приложения" : "С возвращением"}
+              {getStepSubtitle()}
             </p>
           </motion.div>
         </div>
 
-        {/* Card */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -155,7 +244,7 @@ export default function Login({ onLogin }: LoginProps) {
           }}
         >
           <AnimatePresence mode="wait">
-            {step === "credentials" ? (
+            {step === "credentials" && (
               <motion.div
                 key="credentials"
                 initial={{ opacity: 0, x: -16 }}
@@ -235,7 +324,20 @@ export default function Login({ onLogin }: LoginProps) {
                   </motion.button>
                 </form>
 
-                <div className="mt-5 pt-5 border-t border-border text-center">
+                <div className="mt-4 pt-4 border-t border-border">
+                  <motion.button
+                    type="button"
+                    onClick={startQrLogin}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full flex items-center justify-center gap-2 bg-secondary/60 hover:bg-secondary border border-border rounded-2xl px-4 py-3 text-foreground font-bold text-sm transition-all"
+                  >
+                    <QrCode size={17} className="text-primary" />
+                    Войти по QR-коду
+                  </motion.button>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-border text-center">
                   <p className="text-sm font-medium text-muted-foreground">
                     Нет аккаунта?{" "}
                     <Link href="/register" className="text-primary hover:text-primary/80 transition-colors font-bold">
@@ -244,7 +346,9 @@ export default function Login({ onLogin }: LoginProps) {
                   </p>
                 </div>
               </motion.div>
-            ) : (
+            )}
+
+            {step === "2fa" && (
               <motion.div
                 key="2fa"
                 initial={{ opacity: 0, x: 16 }}
@@ -307,10 +411,107 @@ export default function Login({ onLogin }: LoginProps) {
                 </form>
               </motion.div>
             )}
+
+            {step === "qr" && (
+              <motion.div
+                key="qr"
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -16 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col items-center"
+              >
+                {qrStatus === "expired" ? (
+                  <div className="text-center py-4 space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center mx-auto">
+                      <Clock size={28} className="text-destructive" />
+                    </div>
+                    <p className="text-sm text-muted-foreground font-medium">QR-код истёк</p>
+                    <motion.button
+                      onClick={startQrLogin}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center gap-2 mx-auto px-5 py-2.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-2xl text-primary font-bold text-sm transition-all"
+                    >
+                      <RefreshCw size={15} />
+                      Обновить QR
+                    </motion.button>
+                  </div>
+                ) : qrStatus === "confirmed" ? (
+                  <div className="text-center py-4 space-y-3">
+                    <motion.div
+                      initial={{ scale: 0.5, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                      className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto"
+                    >
+                      <CheckCircle2 size={30} className="text-green-500" />
+                    </motion.div>
+                    <p className="text-sm font-bold text-foreground">Вход подтверждён!</p>
+                    <p className="text-xs text-muted-foreground">Выполняем вход...</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground font-medium text-center mb-4 leading-relaxed">
+                      Откройте Pulse на другом устройстве и отсканируйте код
+                    </p>
+
+                    <div
+                      className="p-3 rounded-2xl mb-3 relative"
+                      style={{
+                        background: "hsl(var(--background) / 0.8)",
+                        border: "1px solid hsl(var(--border) / 0.6)",
+                      }}
+                    >
+                      {qrImageUrl ? (
+                        <img
+                          src={qrImageUrl}
+                          alt="QR Code"
+                          width={160}
+                          height={160}
+                          className="rounded-xl"
+                          style={{ imageRendering: "pixelated" }}
+                        />
+                      ) : (
+                        <div className="w-40 h-40 rounded-xl bg-secondary/40 animate-pulse" />
+                      )}
+
+                      <motion.div
+                        className="absolute inset-3 rounded-xl pointer-events-none"
+                        style={{ border: "2px solid hsl(var(--primary) / 0.3)" }}
+                        animate={{ opacity: [0.3, 0.8, 0.3] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium mb-5">
+                      <Clock size={12} className="text-primary/70" />
+                      <span>Код действителен {formatTime(qrTimeLeft)}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
+                      <motion.div
+                        className="w-1.5 h-1.5 rounded-full bg-green-500"
+                        animate={{ opacity: [1, 0.3, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      />
+                      <span>Ожидаем сканирование...</span>
+                    </div>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => { clearQrIntervals(); setStep("credentials"); setQrStatus("idle"); }}
+                  className="w-full text-sm font-bold text-muted-foreground hover:text-foreground transition-colors py-3 mt-4"
+                >
+                  ← Назад
+                </button>
+              </motion.div>
+            )}
           </AnimatePresence>
         </motion.div>
 
-        {/* Version badge */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

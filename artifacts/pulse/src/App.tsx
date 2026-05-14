@@ -32,6 +32,7 @@ import Support from "@/pages/Support";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import ForgotPassword from "@/pages/ForgotPassword";
+import QrConfirm from "@/pages/QrConfirm";
 import NotFound from "@/pages/not-found";
 
 let queryClient = new QueryClient();
@@ -198,6 +199,7 @@ function MainAppInner({ onLogout, onSwitchAccount, onRemoveAccount, onOpenAddAcc
               <Route path="/profile" component={Profile} />
               <Route path="/settings" component={Settings} />
               <Route path="/user/:userId" component={UserProfile} />
+              <Route path="/qr/:tokenId" component={QrConfirm} />
               <Route component={NotFound} />
             </Switch>
           </AppLayout>
