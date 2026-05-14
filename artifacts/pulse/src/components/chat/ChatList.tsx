@@ -3,7 +3,7 @@ import { useGetChats, Chat } from "@workspace/api-client-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Search, Pin, VolumeX, Users, Radio, Bot, HeadphonesIcon, Bug,
-  SquarePen, X, ChevronRight, Check, ArrowLeft, Crown, Bookmark } from "lucide-react";
+  SquarePen, X, ChevronRight, Check, CheckCheck, Clock, ArrowLeft, Crown, Bookmark } from "lucide-react";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -209,7 +209,7 @@ function SavedMessagesEntry({ onOpen }: { onOpen: (id: number) => void }) {
 }
 
 export function ChatList() {
-  const { selectedChatId, setSelectedChatId, typingByChat } = useAppContext();
+  const { selectedChatId, setSelectedChatId, typingByChat, currentUserId } = useAppContext();
   const { t, lang } = useLanguage();
   const [, navigate] = useLocation();
   const { data: chats, isLoading } = useGetChats();
@@ -519,12 +519,20 @@ export function ChatList() {
                         )}
                       </div>
                       {lastMessage && (
-                        <span className={cn(
-                          "text-[11px] font-bold shrink-0 ml-2",
-                          chat.unreadCount > 0 ? "text-foreground" : "text-muted-foreground"
-                        )}>
-                          {formatTime(lastMessage.createdAt)}
-                        </span>
+                        <div className="flex items-center gap-0.5 shrink-0 ml-2">
+                          {lastMessage.senderId === currentUserId && (() => {
+                            const age = Date.now() - new Date(lastMessage.createdAt).getTime();
+                            if (age < 3500) return <Clock size={12} className="text-muted-foreground opacity-60" />;
+                            if (lastMessage.isRead) return <CheckCheck size={14} strokeWidth={2.5} className="text-primary" />;
+                            return <Check size={14} strokeWidth={2.5} className="text-muted-foreground opacity-70" />;
+                          })()}
+                          <span className={cn(
+                            "text-[11px] font-bold",
+                            chat.unreadCount > 0 ? "text-foreground" : "text-muted-foreground"
+                          )}>
+                            {formatTime(lastMessage.createdAt)}
+                          </span>
+                        </div>
                       )}
                     </div>
 

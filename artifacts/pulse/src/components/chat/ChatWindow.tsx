@@ -998,29 +998,38 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
           </div>
         )}
 
-        {(botTyping || typingUsers.length > 0) && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="flex items-center gap-3 text-muted-foreground max-w-3xl mx-auto w-full px-2"
-          >
-            <div className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-secondary/80 border border-border shadow-sm">
-              <span className="text-[13px] font-bold">
-                {botTyping ? botDisplayName : typingUsers[0].displayName} печатает
-              </span>
-              <span className="flex items-center gap-[3px] ml-1">
-                {[0, 0.15, 0.3].map((delay, i) => (
-                  <span
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-foreground opacity-50 inline-block"
-                    style={{ animation: `typingBounce 1.2s ease-in-out infinite`, animationDelay: `${delay}s` }}
-                  />
-                ))}
-              </span>
-            </div>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {(botTyping || typingUsers.length > 0) && (
+            <motion.div
+              key="typing-indicator"
+              initial={{ opacity: 0, y: 8, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.95 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="flex items-end gap-2 max-w-3xl mx-auto w-full px-2"
+            >
+              <div className="w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0 mb-0.5 overflow-hidden">
+                <span className="text-[11px] font-black text-muted-foreground">
+                  {(botTyping ? botDisplayName : typingUsers[0].displayName).charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[11px] font-bold text-muted-foreground px-1">
+                  {botTyping ? botDisplayName : typingUsers[0].displayName}
+                </span>
+                <div className="flex items-center gap-[5px] px-4 py-3 rounded-[18px] rounded-bl-[4px] bg-secondary border border-border shadow-sm">
+                  {[0, 0.18, 0.36].map((delay, i) => (
+                    <span
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-muted-foreground inline-block"
+                      style={{ animation: `typingBounce 1.2s ease-in-out infinite`, animationDelay: `${delay}s` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Smart reply chips */}
