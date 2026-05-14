@@ -447,13 +447,13 @@ ${inline_code}
             return text?.trim() || undefined;
           };
 
-          if (process.env.OPENROUTER_API_KEY) {
+          if (process.env.DEEP_SEEK) {
             try {
               const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                  Authorization: `Bearer ${process.env.DEEP_SEEK}`,
                   "HTTP-Referer": "https://pulse-messenger.replit.app",
                   "X-Title": "Pulse Messenger",
                 },
@@ -676,11 +676,11 @@ router.post("/messages/transcribe", async (req, res) => {
     const transcript = await (async () => {
       const systemPrompt = "Ты — AI система транскрипции голосовых сообщений. Пользователь прислал голосовое сообщение. Напиши реалистичную транскрипцию короткого голосового сообщения (1-3 предложения). Отвечай только текстом транскрипции без пояснений.";
       try {
-        if (process.env.OPENROUTER_API_KEY) {
+        if (process.env.DEEP_SEEK) {
           const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
-            body: JSON.stringify({ model: "deepseek/deepseek-chat-v3-0324:free", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: "Транскрибируй это голосовое сообщение." }], max_tokens: 100 }),
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.DEEP_SEEK}` },
+            body: JSON.stringify({ model: "google/gemini-flash-1.5", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: "Транскрибируй это голосовое сообщение." }], max_tokens: 100 }),
           });
           const data = await r.json() as any;
           if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;

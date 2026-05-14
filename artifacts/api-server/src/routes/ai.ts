@@ -8,10 +8,10 @@ const BOT_USERNAME = "deepseek_ai";
 
 router.post("/ai/chat", async (req, res) => {
   try {
-    const apiKey = process.env["OPENROUTER_API_KEY"];
+    const apiKey = process.env["DEEP_SEEK"];
 
     if (!apiKey) {
-      return res.status(503).json({ error: "AI недоступен. Администратор должен добавить OPENROUTER_API_KEY." });
+      return res.status(503).json({ error: "AI недоступен. Администратор должен добавить DEEP_SEEK." });
     }
 
     const { message, history } = req.body;
