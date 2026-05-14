@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
-import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useInitiateCall, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, Message, useGetMe } from "@workspace/api-client-react";
+import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useInitiateCall, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
+import { useP2PChannel } from "@/hooks/useP2PChannel";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Phone, Video, MoreVertical, ArrowLeft, Search, BellOff, Bell, Pin, PinOff, User, Trash2, X, Timer, Flame, ChevronRight, ChevronDown, Settings, Crown, Palette, Check, Sparkles, Lock, MessageSquare, Users } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -294,6 +295,16 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const initiateCall = useInitiateCall();
   const markAsRead = useMarkChatAsRead();
   const updateChat = useUpdateChat();
+
+  // P2P WebRTC data channel — direct chats only, not bots
+  const p2pEnabled = chat?.type === "direct" && !(chat?.otherUser as any)?.isBot;
+  const p2pOtherUserId = p2pEnabled ? (chat?.otherUser?.id ?? null) : null;
+  const p2p = useP2PChannel(
+    p2pEnabled ? chatId : null,
+    p2pOtherUserId,
+    currentUserId,
+    p2pEnabled,
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -701,6 +712,15 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
         <div className="flex items-center gap-1.5 text-muted-foreground shrink-0">
           {chat.type === "direct" && !(chat.otherUser as any)?.isBot && (
             <>
+              {p2p.isConnected && (
+                <div
+                  title="P2P connected — messages are delivered instantly"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10 text-primary text-[11px] font-bold select-none"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
+                  P2P
+                </div>
+              )}
               <button
                 onClick={() => handleStartCall("audio")}
                 disabled={initiateCall.isPending}
@@ -1088,6 +1108,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
         onCancelReply={() => setReplyTo(null)}
         onCancelEdit={() => setEditMessage(null)}
         isBot={!!isBot}
+        p2p={p2p}
         onMessageSent={() => {
           setSmartReplies([]);
           if (isBot) startBotTypingPoll();

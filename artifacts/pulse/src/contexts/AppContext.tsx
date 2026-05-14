@@ -389,6 +389,13 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
         } catch {}
       });
 
+      es.addEventListener("p2p-signal", (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          window.dispatchEvent(new CustomEvent("pulse:p2p-signal", { detail: data }));
+        } catch {}
+      });
+
       es.onerror = () => {
         es?.close();
         es = null;

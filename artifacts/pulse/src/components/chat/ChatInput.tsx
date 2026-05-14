@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, memo } from "react";
 import { emojiToTwemojiUrl } from "@/lib/twemoji";
 import { useSendMessage, useGetMe, getGetMessagesQueryKey, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
+import type { P2PChannel } from "@/hooks/useP2PChannel";
 import { useQueryClient } from "@tanstack/react-query";
 import { Paperclip, Mic, SendHorizontal, X, Square, Trash2, Images, Reply, Pencil, Clock, BarChart2, Plus, Minus, Wand2, CalendarClock, Hourglass, Sticker } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -106,9 +107,10 @@ export interface ChatInputProps {
   onCancelReply?: () => void;
   onCancelEdit?: () => void;
   isBot?: boolean;
+  p2p?: P2PChannel;
 }
 
-export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCancelReply, onCancelEdit, isBot }: ChatInputProps) {
+export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCancelReply, onCancelEdit, isBot, p2p }: ChatInputProps) {
   const { data: me } = useGetMe();
 
   const [text, setText] = useState("");
@@ -333,9 +335,10 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
     try {
       if (audioBlob) {
         const base64 = await readFileAsDataUrl(new File([audioBlob], "voice.webm", { type: audioBlob.type }));
-        await sendMessage.mutateAsync({
+        const sent = await sendMessage.mutateAsync({
           data: { chatId, type: "audio", mediaUrl: base64, text: `voice:${recordSeconds}`, replyToId: replyTo?.id }
         });
+        if (sent) p2p?.send(sent as Message);
         setAudioBlob(null);
         setRecordSeconds(0);
       } else if (imagePreviews.length > 0) {
@@ -343,7 +346,7 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
           const token = sessionStorage.getItem("pulse-token");
           const hdrs: Record<string, string> = { "Content-Type": "application/json" };
           if (token) hdrs["Authorization"] = `Bearer ${token}`;
-          await fetch("/api/messages", {
+          const res = await fetch("/api/messages", {
             method: "POST",
             headers: hdrs,
             body: JSON.stringify({
@@ -354,8 +357,9 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
               replyToId: replyTo?.id,
             }),
           });
+          if (res.ok) { const m = await res.json(); if (m?.id) p2p?.send(m); }
         } else {
-          await sendMessage.mutateAsync({
+          const sent = await sendMessage.mutateAsync({
             data: {
               chatId,
               type: "image",
@@ -364,6 +368,7 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
               replyToId: replyTo?.id,
             }
           });
+          if (sent) p2p?.send(sent as Message);
         }
         setImagePreviews([]);
         setText("");
@@ -372,14 +377,16 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
           const token = sessionStorage.getItem("pulse-token");
           const hdrs: Record<string, string> = { "Content-Type": "application/json" };
           if (token) hdrs["Authorization"] = `Bearer ${token}`;
-          await fetch("/api/messages", {
+          const res = await fetch("/api/messages", {
             method: "POST",
             headers: hdrs,
             body: JSON.stringify({ chatId, text, type: "text", replyToId: replyTo?.id, effect: selectedEffect }),
           });
+          if (res.ok) { const m = await res.json(); if (m?.id) p2p?.send(m); }
           setSelectedEffect(null);
         } else {
-          await sendMessage.mutateAsync({ data: { chatId, text, type: "text", replyToId: replyTo?.id } });
+          const sent = await sendMessage.mutateAsync({ data: { chatId, text, type: "text", replyToId: replyTo?.id } });
+          if (sent) p2p?.send(sent as Message);
         }
         setText("");
         if (textareaRef.current) textareaRef.current.style.height = "44px";

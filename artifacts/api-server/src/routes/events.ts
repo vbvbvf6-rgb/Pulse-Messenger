@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
   subscribeToChatEvents, unsubscribeFromChatEvents,
   subscribeToUserEvents, unsubscribeFromUserEvents,
-  setTyping, stopTyping,
+  setTyping, stopTyping, broadcastToUser,
 } from "../lib/sse";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -66,6 +66,28 @@ router.post("/chats/:chatId/typing/stop", async (req, res) => {
     res.json({ ok: true });
   } catch {
     res.json({ ok: false });
+  }
+});
+
+// P2P WebRTC signaling for data channels (direct chat messaging)
+router.post("/chats/:chatId/p2p-signal", async (req, res) => {
+  const chatId = Number(req.params.chatId);
+  const uid = req.currentUserId;
+  const { type, payload } = req.body;
+  if (!type || payload === undefined) return res.status(400).json({ error: "Missing type or payload" });
+
+  try {
+    const member = await db.execute(
+      sql`SELECT user_id FROM chat_members WHERE chat_id = ${chatId} AND user_id != ${uid} LIMIT 1`
+    );
+    const targetId = (member.rows[0] as any)?.user_id;
+    if (targetId) {
+      broadcastToUser(Number(targetId), "p2p-signal", { chatId, type, payload, fromUserId: uid });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
