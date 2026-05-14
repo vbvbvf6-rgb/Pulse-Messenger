@@ -449,7 +449,8 @@ ${inline_code}
             { role: "user", content: userContent },
           ];
 
-          const TIMEOUT_MS = 12000;
+          const TIMEOUT_MS = 7000;
+          const MAX_TOKENS = 500;
 
           const callOpenRouter = async (model: string): Promise<string | undefined> => {
             if (!process.env.DEEP_SEEK) return undefined;
@@ -461,7 +462,7 @@ ${inline_code}
                 "HTTP-Referer": "https://pulse-messenger.replit.app",
                 "X-Title": "Pulse Messenger",
               },
-              body: JSON.stringify({ model, messages: chatPayload, max_tokens: 1200, temperature: 0.7 }),
+              body: JSON.stringify({ model, messages: chatPayload, max_tokens: MAX_TOKENS, temperature: 0.7 }),
               signal: AbortSignal.timeout(TIMEOUT_MS),
             });
             if (!r.ok) return undefined;
@@ -499,9 +500,12 @@ ${inline_code}
           let reply: string | undefined;
           try {
             reply = await raceFirst([
-              callOpenRouter("google/gemini-flash-1.5-8b"),
-              callOpenRouter("meta-llama/llama-3.1-8b-instruct:free"),
-              callPollinations("openai"),
+              // Priority: fast non-thinking models via OpenRouter
+              callOpenRouter("deepseek/deepseek-chat"),
+              callOpenRouter("google/gemini-flash-1.5"),
+              callOpenRouter("openai/gpt-4o-mini"),
+              // Free fallbacks via Pollinations (no API key needed)
+              callPollinations("phi"),
               callPollinations("mistral"),
             ]);
           } catch {}

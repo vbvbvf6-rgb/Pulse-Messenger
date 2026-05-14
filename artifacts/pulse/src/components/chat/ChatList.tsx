@@ -522,7 +522,7 @@ export function ChatList() {
                         <div className="flex items-center gap-0.5 shrink-0 ml-2">
                           {lastMessage.senderId === currentUserId && (() => {
                             const age = Date.now() - new Date(lastMessage.createdAt).getTime();
-                            if (age < 3500) return <Clock size={12} className="text-muted-foreground opacity-60" />;
+                            if (age < 1500) return <Clock size={12} className="text-muted-foreground opacity-60" />;
                             if (lastMessage.isRead) return <CheckCheck size={14} strokeWidth={2.5} className="text-primary" />;
                             return <Check size={14} strokeWidth={2.5} className="text-muted-foreground opacity-70" />;
                           })()}

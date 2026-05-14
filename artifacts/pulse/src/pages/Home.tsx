@@ -91,15 +91,26 @@ export default function Home() {
         {selectedChatId ? (
           <ChatWindow chatId={selectedChatId} />
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-background/50">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                <div className="w-8 h-8 bg-primary rounded-full" />
+          <div className="flex-1 flex items-center justify-center bg-background/50 relative overflow-hidden">
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px]" />
+            </div>
+            <div className="text-center relative z-10 space-y-5 max-w-xs px-6">
+              <div className="w-20 h-20 mx-auto rounded-[28px] bg-gradient-to-br from-primary to-violet-700 flex items-center justify-center shadow-[0_8px_40px_rgba(139,92,246,0.35)]">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                  <path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z" fill="white" />
+                </svg>
               </div>
-              <h2 className="text-xl font-bold mb-2">Pulse</h2>
-              <p className="text-muted-foreground max-w-sm">
-                Выберите чат слева или найдите пользователя чтобы начать переписку.
-              </p>
+              <div className="space-y-1.5">
+                <h2 className="text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-foreground to-muted-foreground">Pulse</h2>
+                <p className="text-[14px] text-muted-foreground leading-relaxed">
+                  Выберите чат слева или найдите нового собеседника.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-[12px] text-muted-foreground/50 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block animate-pulse" />
+                Зашифровано · Быстро · Красиво
+              </div>
             </div>
           </div>
         )}

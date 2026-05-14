@@ -493,12 +493,12 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     pollRef.current = setInterval(async () => {
       attempts++;
       await queryClient.refetchQueries({ queryKey: getGetMessagesQueryKey({ chatId }) });
-      if (attempts >= 50) {
+      if (attempts >= 20) {
         setBotTyping(false);
         setTypingForChat(chatId, []);
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       }
-    }, 1500);
+    }, 600);
   };
 
   useEffect(() => {

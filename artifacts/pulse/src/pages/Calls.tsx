@@ -80,7 +80,7 @@ export default function Calls() {
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 md:pb-0">
+      <div className="flex-1 overflow-y-auto scrollbar-none pb-24 md:pb-0">
         {isLoading ? (
           <div className="p-4 space-y-3">
             {[1, 2, 3, 4].map((i) => (
@@ -131,7 +131,7 @@ export default function Calls() {
                   >
                     {/* Avatar */}
                     <div
-                      className="w-13 h-13 w-[52px] h-[52px] rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden shrink-0 shadow-md"
+                      className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden shrink-0 shadow-md"
                       style={{ backgroundColor: otherUser?.avatarColor || "#444" }}
                     >
                       {otherUser?.avatarUrl ? (

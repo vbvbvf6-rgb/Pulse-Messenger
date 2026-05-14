@@ -355,17 +355,17 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
-  // Pending state — show clock for ~3s after a new outgoing message appears
+  // Pending state — show clock for ~1.5s after a new outgoing message appears
   const [isPending, setIsPending] = useState<boolean>(() => {
     if (!isMine) return false;
     const age = Date.now() - new Date(message.createdAt).getTime();
-    return age < 3500;
+    return age < 1500;
   });
 
   useEffect(() => {
     if (!isMine) return undefined;
     const age = Date.now() - new Date(message.createdAt).getTime();
-    const remaining = 3500 - age;
+    const remaining = 1500 - age;
     if (remaining > 0) {
       const t = setTimeout(() => setIsPending(false), remaining);
       return () => clearTimeout(t);

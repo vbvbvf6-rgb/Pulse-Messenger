@@ -5,7 +5,8 @@ import { sql } from "drizzle-orm";
 const router = Router();
 
 const BOT_USERNAME = "deepseek_ai";
-const TIMEOUT_MS = 12000;
+const TIMEOUT_MS = 7000;
+const MAX_TOKENS = 500;
 
 async function raceFirst(tasks: Promise<string | undefined>[]): Promise<string | undefined> {
   return new Promise((resolve) => {
@@ -31,7 +32,7 @@ async function callOpenRouter(
         "HTTP-Referer": "https://pulse-messenger.replit.app",
         "X-Title": "Pulse Messenger",
       },
-      body: JSON.stringify({ model, messages, max_tokens: 1200, temperature: 0.7 }),
+      body: JSON.stringify({ model, messages, max_tokens: MAX_TOKENS, temperature: 0.7 }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!r.ok) return undefined;
@@ -82,14 +83,15 @@ router.post("/ai/chat", async (req, res) => {
     const apiKey = process.env["DEEP_SEEK"];
 
     const tasks: Promise<string | undefined>[] = [
-      callPollinations(systemPrompt, message, historySlice, "openai"),
+      callPollinations(systemPrompt, message, historySlice, "phi"),
       callPollinations(systemPrompt, message, historySlice, "mistral"),
     ];
 
     if (apiKey) {
       tasks.unshift(
-        callOpenRouter(apiKey, "google/gemini-flash-1.5-8b", messages),
-        callOpenRouter(apiKey, "meta-llama/llama-3.1-8b-instruct:free", messages),
+        callOpenRouter(apiKey, "deepseek/deepseek-chat", messages),
+        callOpenRouter(apiKey, "google/gemini-flash-1.5", messages),
+        callOpenRouter(apiKey, "openai/gpt-4o-mini", messages),
       );
     }
 
