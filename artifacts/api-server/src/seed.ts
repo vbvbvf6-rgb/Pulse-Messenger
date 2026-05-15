@@ -171,20 +171,11 @@ const GIFT_CATALOG = [
 
 const SYSTEM_USERS = [
   {
-    username: "deepseek_ai",
-    displayName: "DeepSeek AI",
-    avatarColor: "#8B5CF6",
-    avatarUrl: "/deepseek-avatar.jpg",
-    isBot: true,
-    isVerified: true,
-    status: "online",
-  },
-  {
     username: "creater_messenger",
     displayName: "creater_messenger",
     avatarColor: "#F59E0B",
     isBot: false,
-    isVerified: false,
+    isVerified: true,
     isAdmin: true,
     status: "online",
     password: "pulse2024",
@@ -234,42 +225,47 @@ export async function runSeed() {
     }
   }
 
-  // Ensure DeepSeek bot is in all non-bot users' contacts
-  const bot = await db.execute(sql`SELECT id FROM users WHERE username = 'deepseek_ai' LIMIT 1`);
-  const botId = (bot.rows as any[])[0]?.id;
-  if (botId) {
-    await db.execute(sql`
-      INSERT INTO contacts (user_id, contact_id)
-      SELECT u.id, ${botId} FROM users u
-      WHERE u.is_bot = false AND u.id != ${botId}
-        AND NOT EXISTS (SELECT 1 FROM contacts c WHERE c.user_id = u.id AND c.contact_id = ${botId})
-    `);
-
-    // Ensure every non-bot user has a direct chat with DeepSeek
-    const users = await db.execute(sql`SELECT id FROM users WHERE is_bot = false AND id != ${botId}`);
-    for (const u of users.rows as any[]) {
-      const existing = await db.execute(sql`
-        SELECT c.id FROM chats c
-        JOIN chat_members cm1 ON cm1.chat_id = c.id AND cm1.user_id = ${u.id}
-        JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_id = ${botId}
-        WHERE c.type = 'direct'
-        LIMIT 1
+  // Ensure the official Pulse verified channel exists
+  const adminRow = await db.execute(sql`SELECT id FROM users WHERE username = 'creater_messenger' LIMIT 1`);
+  const adminId = (adminRow.rows as any[])[0]?.id;
+  if (adminId) {
+    const existingChannel = await db.execute(sql`SELECT id FROM chats WHERE type = 'channel' AND name = 'Pulse' LIMIT 1`);
+    if ((existingChannel.rows as any[]).length === 0) {
+      const channelResult = await db.execute(sql`
+        INSERT INTO chats (type, name, description, avatar_color)
+        VALUES ('channel', 'Pulse', 'Официальный канал Pulse Messenger', '#8B5CF6')
+        RETURNING id
       `);
-      if ((existing.rows as any[]).length === 0) {
-        const chatResult = await db.execute(sql`
-          INSERT INTO chats (type, avatar_color) VALUES ('direct', '#8B5CF6') RETURNING id
+      const channelId = (channelResult.rows as any[])[0]?.id;
+      if (channelId) {
+        await db.execute(sql`
+          INSERT INTO chat_members (chat_id, user_id, role)
+          VALUES (${channelId}, ${adminId}, 'owner')
+          ON CONFLICT DO NOTHING
         `);
-        const chatId = (chatResult.rows as any[])[0]?.id;
-        if (chatId) {
-          await db.execute(sql`
-            INSERT INTO chat_members (chat_id, user_id, role) VALUES
-              (${chatId}, ${u.id}, 'member'),
-              (${chatId}, ${botId}, 'member')
-            ON CONFLICT DO NOTHING
-          `);
-          console.log(`[seed] Created DeepSeek chat for user ${u.id}`);
-        }
+        await db.execute(sql`
+          INSERT INTO chat_members (chat_id, user_id, role)
+          SELECT ${channelId}, id, 'member' FROM users
+          WHERE id != ${adminId} AND is_bot = false
+          ON CONFLICT DO NOTHING
+        `);
+        console.log(`[seed] Created official Pulse channel (id=${channelId})`);
       }
+    } else {
+      // Ensure admin is owner
+      const channelId = (existingChannel.rows as any[])[0]?.id;
+      await db.execute(sql`
+        INSERT INTO chat_members (chat_id, user_id, role)
+        VALUES (${channelId}, ${adminId}, 'owner')
+        ON CONFLICT (chat_id, user_id) DO UPDATE SET role = 'owner'
+      `);
+      // Add any users not yet in the channel
+      await db.execute(sql`
+        INSERT INTO chat_members (chat_id, user_id, role)
+        SELECT ${channelId}, id, 'member' FROM users
+        WHERE id != ${adminId} AND is_bot = false
+        ON CONFLICT DO NOTHING
+      `);
     }
   }
 }

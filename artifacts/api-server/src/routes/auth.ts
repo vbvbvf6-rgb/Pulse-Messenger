@@ -344,48 +344,14 @@ router.post("/auth/register", async (req, res) => {
     );
     const newUser = result.rows[0] as any;
 
+    // Auto-join all existing channels
     try {
       await db.execute(
         sql`INSERT INTO chat_members (chat_id, user_id, role, last_read_at)
             SELECT id, ${newUser.id}, 'member', NOW()
-            FROM chats WHERE type IN ('group', 'channel') AND id IN (2, 3)
+            FROM chats WHERE type = 'channel'
             ON CONFLICT DO NOTHING`
       );
-    } catch {}
-
-    // Auto-add DeepSeek bot to contacts and create a direct chat
-    try {
-      const botRows = await db.execute(sql`SELECT id FROM users WHERE username = 'deepseek_ai' LIMIT 1`);
-      const botId = (botRows.rows as any[])[0]?.id;
-      if (botId) {
-        // Add to contacts
-        await db.execute(sql`
-          INSERT INTO contacts (user_id, contact_id) VALUES (${newUser.id}, ${botId})
-          ON CONFLICT DO NOTHING
-        `);
-        // Create direct chat
-        const existingChat = await db.execute(sql`
-          SELECT c.id FROM chats c
-          JOIN chat_members cm1 ON cm1.chat_id = c.id AND cm1.user_id = ${newUser.id}
-          JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_id = ${botId}
-          WHERE c.type = 'direct'
-          LIMIT 1
-        `);
-        if ((existingChat.rows as any[]).length === 0) {
-          const chatResult = await db.execute(sql`
-            INSERT INTO chats (type, avatar_color) VALUES ('direct', '#8B5CF6') RETURNING id
-          `);
-          const chatId = (chatResult.rows as any[])[0]?.id;
-          if (chatId) {
-            await db.execute(sql`
-              INSERT INTO chat_members (chat_id, user_id, role) VALUES
-                (${chatId}, ${newUser.id}, 'member'),
-                (${chatId}, ${botId}, 'member')
-              ON CONFLICT DO NOTHING
-            `);
-          }
-        }
-      }
     } catch {}
 
     const token = signToken(newUser.id);

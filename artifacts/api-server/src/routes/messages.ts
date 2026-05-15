@@ -237,6 +237,19 @@ router.post("/messages", async (req, res) => {
       return res.status(403).json({ error: "Нет доступа к этому чату" });
     }
 
+    // Channel restriction: only owners/admins can post standalone messages; everyone else can only comment (reply)
+    const chatInfo = await db.query.chatsTable.findFirst({ where: eq(chatsTable.id, body.chatId) });
+    if (chatInfo?.type === "channel" && !body.replyToId) {
+      const memberInfo = await db.query.chatMembersTable.findFirst({
+        where: and(eq(chatMembersTable.chatId, body.chatId), eq(chatMembersTable.userId, uid)),
+      });
+      const userAdminRow = await db.execute(sql`SELECT is_admin FROM users WHERE id = ${uid}`);
+      const isGlobalAdmin = !!(userAdminRow.rows[0] as any)?.is_admin;
+      if (!isGlobalAdmin && memberInfo?.role !== "owner" && memberInfo?.role !== "admin") {
+        return res.status(403).json({ error: "Только администраторы могут публиковать в этом канале" });
+      }
+    }
+
     if (body.text && body.text.length > 4000) {
       return res.status(400).json({ error: "Сообщение слишком длинное (максимум 4000 символов)" });
     }

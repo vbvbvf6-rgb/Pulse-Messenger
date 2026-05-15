@@ -618,6 +618,9 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const displayName = chat.type === "direct" ? (chat.otherUser?.displayName || chat.name || "Chat") : (chat.name || "Group");
   const avatarColor = chat.type === "direct" ? (chat.otherUser?.avatarColor || chat.avatarColor || "#333") : (chat.avatarColor || "#333");
   const isVerified = chat.type === "direct" && (chat.otherUser as any)?.isVerified;
+  const isChannel = chat.type === "channel";
+  const myMemberRole = (chat.members as any[])?.find((m: any) => m.userId === currentUserId)?.role;
+  const isChannelAdmin = isChannel && (myMemberRole === "owner" || myMemberRole === "admin");
   const otherUserHasPrime = chat.type === "direct" && (chat.otherUser as any)?.hasPrime;
   const otherUserIsPlus   = chat.type === "direct" && (chat.otherUser as any)?.primeTier === "prime_plus";
   const autoDeleteLabel = formatAutoDeleteLabel(autoDeleteTimer);
@@ -692,6 +695,12 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
                   <path d="M7 12l3.5 3.5L17 8" stroke="currentColor" className="text-primary-foreground" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               )}
+              {isChannel && (
+                <svg className="shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="12" fill="currentColor" className="text-primary"/>
+                  <path d="M7 12l3.5 3.5L17 8" stroke="currentColor" className="text-primary-foreground" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
               {autoDeleteTimer ? (
                 <span className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-violet-500 text-white shrink-0 shadow-[0_2px_8px_rgba(139,92,246,0.3)]">
                   <Flame size={12} fill="currentColor" />
@@ -703,6 +712,12 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
               {chat.type === "direct" && chat.otherUser ? (
                 <span className={chat.otherUser.status === "online" ? "text-primary" : ""}>
                   {chat.otherUser.status === "online" ? t("chat.online") : (chat.otherUser as any).statusText || t("chat.offline")}
+                </span>
+              ) : isChannel ? (
+                <span className="flex items-center gap-1">
+                  <span className="text-primary font-semibold">Верифицированный канал</span>
+                  <span>·</span>
+                  <span>{chat.members?.length || 0} подписчиков</span>
                 </span>
               ) : `${chat.members?.length || 0} ${t("chat.members")}`}
             </p>
@@ -1109,6 +1124,8 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
         onCancelEdit={() => setEditMessage(null)}
         isBot={!!isBot}
         p2p={p2p}
+        isChannel={isChannel}
+        isChannelAdmin={isChannelAdmin}
         onMessageSent={() => {
           setSmartReplies([]);
           if (isBot) startBotTypingPoll();
