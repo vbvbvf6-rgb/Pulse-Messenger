@@ -250,15 +250,6 @@ export default function Register({ onLogin }: RegisterProps) {
         className="w-full max-w-sm relative z-10 py-4"
       >
         <div className="flex flex-col items-center mb-6 sm:mb-10">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.2 }}
-            className="w-16 h-16 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-card border border-border flex items-center justify-center shadow-2xl mb-4 sm:mb-6 relative"
-          >
-            <div className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-primary/5 shadow-[inset_0_0_20px_rgba(255,85,0,0.1)]" />
-            <PulseLogo size={36} />
-          </motion.div>
           <h1 className="text-3xl sm:text-4xl font-black text-foreground tracking-tight mb-2">Pulse</h1>
           <p className="text-muted-foreground text-sm font-medium">
             {step === "verify-email" ? "Подтверждение email" : "Новый аккаунт"}
