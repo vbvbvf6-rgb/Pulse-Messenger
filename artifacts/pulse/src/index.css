@@ -116,6 +116,16 @@
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: hsl(var(--background));
+    overflow: hidden;
   }
 
   body {
@@ -124,6 +134,18 @@
     text-size-adjust: 100%;
     font-size: var(--app-font-size, 15px);
     letter-spacing: -0.01em;
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  #root {
+    height: 100%;
+    width: 100%;
+    background-color: hsl(var(--background));
+    overflow: hidden;
   }
 
   /* Fix text blur on mobile/webkit */
