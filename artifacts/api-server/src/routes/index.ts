@@ -21,6 +21,7 @@ import pushRouter from "./push";
 import pollsRouter from "./polls";
 import translateRouter from "./translate";
 import referralRouter from "./referral";
+import foldersRouter from "./folders";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(pushRouter);
 router.use(pollsRouter);
 router.use(translateRouter);
 router.use(referralRouter);
+router.use(foldersRouter);
 
 export default router;

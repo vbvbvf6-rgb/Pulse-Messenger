@@ -28,6 +28,21 @@ export const chatMembersTable = pgTable("chat_members", {
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique("chat_members_chat_user_unique").on(t.chatId, t.userId)]);
 
+export const chatFoldersTable = pgTable("chat_folders", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => usersTable.id),
+  name: text("name").notNull(),
+  icon: text("icon").notNull().default("📁"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const chatFolderChatsTable = pgTable("chat_folder_chats", {
+  id: serial("id").primaryKey(),
+  folderId: integer("folder_id").notNull(),
+  chatId: integer("chat_id").notNull().references(() => chatsTable.id),
+}, (t) => [unique("folder_chat_unique").on(t.folderId, t.chatId)]);
+
 export const insertChatSchema = createInsertSchema(chatsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertChatMemberSchema = createInsertSchema(chatMembersTable).omit({ id: true, joinedAt: true });
 export type InsertChat = z.infer<typeof insertChatSchema>;

@@ -1,10 +1,11 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useGetChats, Chat } from "@workspace/api-client-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Search, Pin, VolumeX, Users, Radio, Bot, HeadphonesIcon, Bug,
-  SquarePen, X, ChevronRight, Check, CheckCheck, Clock, ArrowLeft, Crown, Bookmark } from "lucide-react";
+  SquarePen, X, ChevronRight, Check, CheckCheck, Clock, ArrowLeft, Crown, Bookmark,
+  FolderPlus, Folder, Trash2, FolderOpen, Plus } from "lucide-react";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,13 +18,22 @@ import { GlobalSearch } from "./GlobalSearch";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
-type FolderKey = "all" | "unread" | "groups";
+type FolderKey = "all" | "unread" | "groups" | `folder:${number}`;
 
-const FOLDERS: { key: FolderKey; label: string }[] = [
+interface UserFolder {
+  id: number;
+  name: string;
+  icon: string;
+  sortOrder: number;
+}
+
+const SYSTEM_FOLDERS: { key: FolderKey; label: string }[] = [
   { key: "all",    label: "Все" },
   { key: "unread", label: "Новые" },
   { key: "groups", label: "Группы" },
 ];
+
+const FOLDER_ICONS = ["📁","💬","⭐","🔥","👔","🏠","🎮","📚","💼","❤️","🎵","🌍","🏋️","🎨","💰","🤝","🐾","📰","✈️","🎉"];
 
 function VerifiedBadge() {
   return (
@@ -220,6 +230,19 @@ export function ChatList() {
   const [folder, setFolder] = useState<FolderKey>("all");
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
 
+  // Custom folders state
+  const [userFolders, setUserFolders] = useState<UserFolder[]>([]);
+  const [folderChatIds, setFolderChatIds] = useState<Set<number>>(new Set());
+  const [showFolderCreate, setShowFolderCreate] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderIcon, setNewFolderIcon] = useState("📁");
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [contextMenuChat, setContextMenuChat] = useState<Chat | null>(null);
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [folderTabLongPress, setFolderTabLongPress] = useState<number | null>(null);
+  const folderTabPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Create group/channel modal state
   const [showCreate, setShowCreate] = useState(false);
   const [createStep, setCreateStep] = useState<CreateStep>("choose");
@@ -237,6 +260,86 @@ export function ChatList() {
     const token = sessionStorage.getItem("pulse-token");
     return token ? { "Authorization": `Bearer ${token}` } : {};
   }
+
+  const fetchFolders = useCallback(async () => {
+    try {
+      const res = await fetch("/api/folders", { headers: getAuthHeaders() });
+      if (res.ok) setUserFolders(await res.json());
+    } catch {}
+  }, []);
+
+  const fetchFolderChatIds = useCallback(async (folderId: number) => {
+    try {
+      const res = await fetch(`/api/folders/${folderId}/chats`, { headers: getAuthHeaders() });
+      if (res.ok) setFolderChatIds(new Set(await res.json()));
+    } catch {}
+  }, []);
+
+  useEffect(() => { fetchFolders(); }, [fetchFolders]);
+
+  useEffect(() => {
+    if (folder.startsWith("folder:")) {
+      fetchFolderChatIds(Number(folder.split(":")[1]));
+    }
+  }, [folder, fetchFolderChatIds]);
+
+  const createFolder = async () => {
+    if (!newFolderName.trim()) return;
+    setCreatingFolder(true);
+    try {
+      const res = await fetch("/api/folders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ name: newFolderName.trim(), icon: newFolderIcon }),
+      });
+      if (res.ok) {
+        const f = await res.json();
+        setUserFolders(prev => [...prev, f]);
+        setShowFolderCreate(false);
+        setNewFolderName("");
+        setNewFolderIcon("📁");
+        toast({ title: "Папка создана", description: f.name });
+      }
+    } catch {}
+    setCreatingFolder(false);
+  };
+
+  const deleteFolder = async (folderId: number) => {
+    try {
+      await fetch(`/api/folders/${folderId}`, { method: "DELETE", headers: getAuthHeaders() });
+      setUserFolders(prev => prev.filter(f => f.id !== folderId));
+      if (folder === `folder:${folderId}`) setFolder("all");
+      toast({ title: "Папка удалена" });
+    } catch {}
+    setFolderTabLongPress(null);
+  };
+
+  const addChatToFolder = async (folderId: number, chatId: number) => {
+    try {
+      await fetch(`/api/folders/${folderId}/chats`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        body: JSON.stringify({ chatId }),
+      });
+      if (folder === `folder:${folderId}`) {
+        setFolderChatIds(prev => new Set([...prev, chatId]));
+      }
+      toast({ title: "Чат добавлен в папку" });
+    } catch {}
+    setContextMenuChat(null);
+    setShowFolderPicker(false);
+  };
+
+  const removeChatFromFolder = async () => {
+    if (!contextMenuChat || !folder.startsWith("folder:")) return;
+    const folderId = Number(folder.split(":")[1]);
+    try {
+      await fetch(`/api/folders/${folderId}/chats/${contextMenuChat.id}`, { method: "DELETE", headers: getAuthHeaders() });
+      setFolderChatIds(prev => { const s = new Set(prev); s.delete(contextMenuChat.id); return s; });
+      toast({ title: "Чат убран из папки" });
+    } catch {}
+    setContextMenuChat(null);
+  };
 
   const openCreate = () => {
     setCreateStep("choose");
@@ -321,6 +424,7 @@ export function ChatList() {
     if ((chat as any).type === "saved") return false;
     if (folder === "unread") return (chat.unreadCount ?? 0) > 0;
     if (folder === "groups") return chat.type === "group" || chat.type === "channel";
+    if (folder.startsWith("folder:")) return folderChatIds.has(chat.id);
     return true;
   });
 
@@ -359,7 +463,7 @@ export function ChatList() {
         </div>
 
         <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-none pb-1">
-          {FOLDERS.map(f => {
+          {SYSTEM_FOLDERS.map(f => {
             const isActive = folder === f.key;
             const count = f.key === "unread" && chats ? chats.filter((c: Chat) => (c.unreadCount ?? 0) > 0).length : 0;
             return (
@@ -385,6 +489,40 @@ export function ChatList() {
               </button>
             );
           })}
+
+          {userFolders.map(f => {
+            const key = `folder:${f.id}` as FolderKey;
+            const isActive = folder === key;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFolder(key)}
+                onTouchStart={() => {
+                  folderTabPressTimer.current = setTimeout(() => setFolderTabLongPress(f.id), 600);
+                }}
+                onTouchEnd={() => { if (folderTabPressTimer.current) clearTimeout(folderTabPressTimer.current); }}
+                onTouchMove={() => { if (folderTabPressTimer.current) clearTimeout(folderTabPressTimer.current); }}
+                onContextMenu={e => { e.preventDefault(); setFolderTabLongPress(f.id); }}
+                className={cn(
+                  "shrink-0 px-3 py-2 rounded-[14px] text-sm font-bold transition-all whitespace-nowrap border flex items-center gap-1.5",
+                  isActive
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-foreground"
+                )}
+              >
+                <span>{f.icon}</span>
+                <span>{f.name}</span>
+              </button>
+            );
+          })}
+
+          <button
+            onClick={() => { setNewFolderName(""); setNewFolderIcon("📁"); setShowFolderCreate(true); }}
+            className="shrink-0 w-9 h-9 rounded-[14px] border border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-all"
+            title="Новая папка"
+          >
+            <Plus size={15} />
+          </button>
         </div>
       </div>
 
@@ -487,6 +625,10 @@ export function ChatList() {
                 <button
                   key={chat.id}
                   onClick={() => setSelectedChatId(chat.id)}
+                  onContextMenu={e => { e.preventDefault(); setContextMenuChat(chat); }}
+                  onTouchStart={() => { longPressTimer.current = setTimeout(() => setContextMenuChat(chat), 500); }}
+                  onTouchEnd={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+                  onTouchMove={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
                   className={cn(
                     "w-full flex items-center gap-4 px-3 py-3 rounded-2xl transition-all text-left group border",
                     isSelected
@@ -782,6 +924,228 @@ export function ChatList() {
         )}
       </AnimatePresence>,
       document.body
+      )}
+
+      {/* Folder Create Modal */}
+      {createPortal(
+        <AnimatePresence>
+        {showFolderCreate && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-md flex items-end sm:items-center justify-center p-4"
+            onClick={e => { if (e.target === e.currentTarget) setShowFolderCreate(false); }}
+          >
+            <motion.div
+              initial={{ y: "100%", opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: "100%", opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="bg-card rounded-[32px] border border-border w-full max-w-sm overflow-hidden shadow-2xl"
+            >
+              <div className="flex items-center gap-3 px-6 py-5 border-b border-border">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <FolderPlus size={18} className="text-primary" />
+                </div>
+                <h2 className="font-black text-xl text-foreground flex-1">Новая папка</h2>
+                <button onClick={() => setShowFolderCreate(false)} className="p-2 -mr-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-6 space-y-5">
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Название</label>
+                  <Input
+                    autoFocus
+                    placeholder="Например: Работа, Семья..."
+                    value={newFolderName}
+                    onChange={e => setNewFolderName(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") createFolder(); }}
+                    className="bg-secondary/50 border-transparent focus-visible:bg-card h-12 rounded-xl text-base font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Иконка</label>
+                  <div className="grid grid-cols-10 gap-1.5">
+                    {FOLDER_ICONS.map(emoji => (
+                      <button
+                        key={emoji}
+                        onClick={() => setNewFolderIcon(emoji)}
+                        className={cn(
+                          "w-9 h-9 rounded-xl text-xl flex items-center justify-center transition-all border",
+                          newFolderIcon === emoji
+                            ? "bg-primary/20 border-primary/50 scale-110"
+                            : "bg-secondary/50 border-transparent hover:bg-secondary"
+                        )}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={createFolder}
+                  disabled={!newFolderName.trim() || creatingFolder}
+                  className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-black disabled:opacity-50 hover:bg-primary/90 transition-all shadow-[0_4px_14px_rgba(139,92,246,0.3)]"
+                >
+                  {creatingFolder ? "Создание..." : `Создать папку ${newFolderIcon}`}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Chat Context Menu (long-press) */}
+      {createPortal(
+        <AnimatePresence>
+        {contextMenuChat && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-end justify-center"
+            onClick={e => { if (e.target === e.currentTarget) { setContextMenuChat(null); setShowFolderPicker(false); } }}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="bg-card rounded-t-[32px] border-t border-x border-border w-full max-w-md overflow-hidden shadow-2xl pb-safe"
+            >
+              <div className="px-6 py-5 border-b border-border">
+                <p className="font-black text-base text-foreground">
+                  {contextMenuChat.type === "direct"
+                    ? (contextMenuChat.otherUser as any)?.displayName || contextMenuChat.name
+                    : contextMenuChat.name}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium mt-0.5">Действия с чатом</p>
+              </div>
+
+              {!showFolderPicker ? (
+                <div className="p-3 space-y-1">
+                  <button
+                    onClick={() => setShowFolderPicker(true)}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl hover:bg-secondary transition-colors text-left"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <FolderOpen size={18} className="text-primary" />
+                    </div>
+                    <span className="font-bold text-[15px] text-foreground">Добавить в папку</span>
+                  </button>
+                  {folder.startsWith("folder:") && (
+                    <button
+                      onClick={removeChatFromFolder}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl hover:bg-secondary transition-colors text-left"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
+                        <Trash2 size={18} className="text-red-500" />
+                      </div>
+                      <span className="font-bold text-[15px] text-foreground">Убрать из папки</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setContextMenuChat(null); setShowFolderPicker(false); }}
+                    className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl hover:bg-secondary transition-colors text-muted-foreground font-bold text-[15px] mt-1"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-3 py-2">Выберите папку</p>
+                  {userFolders.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-sm font-medium">
+                      Нет папок. Создайте папку сначала.
+                    </div>
+                  ) : (
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {userFolders.map(f => (
+                        <button
+                          key={f.id}
+                          onClick={() => addChatToFolder(f.id, contextMenuChat.id)}
+                          className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl hover:bg-secondary transition-colors text-left"
+                        >
+                          <span className="text-xl">{f.icon}</span>
+                          <span className="font-bold text-[15px] text-foreground">{f.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowFolderPicker(false)}
+                    className="w-full flex items-center justify-center px-4 py-3 rounded-2xl hover:bg-secondary transition-colors text-muted-foreground font-bold text-sm mt-1"
+                  >
+                    ← Назад
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* Folder Tab Long-press: delete confirmation */}
+      {createPortal(
+        <AnimatePresence>
+        {folderTabLongPress !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-end justify-center"
+            onClick={e => { if (e.target === e.currentTarget) setFolderTabLongPress(null); }}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="bg-card rounded-t-[32px] border-t border-x border-border w-full max-w-md overflow-hidden shadow-2xl pb-safe"
+            >
+              {(() => {
+                const f = userFolders.find(x => x.id === folderTabLongPress);
+                if (!f) return null;
+                return (
+                  <>
+                    <div className="px-6 py-5 border-b border-border flex items-center gap-3">
+                      <span className="text-2xl">{f.icon}</span>
+                      <div>
+                        <p className="font-black text-base text-foreground">{f.name}</p>
+                        <p className="text-xs text-muted-foreground font-medium">Управление папкой</p>
+                      </div>
+                    </div>
+                    <div className="p-3 space-y-1">
+                      <button
+                        onClick={() => deleteFolder(f.id)}
+                        className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl hover:bg-red-500/10 transition-colors text-left"
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center shrink-0">
+                          <Trash2 size={18} className="text-red-500" />
+                        </div>
+                        <span className="font-bold text-[15px] text-red-500">Удалить папку</span>
+                      </button>
+                      <button
+                        onClick={() => setFolderTabLongPress(null)}
+                        className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl hover:bg-secondary transition-colors text-muted-foreground font-bold text-[15px]"
+                      >
+                        Отмена
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+        </AnimatePresence>,
+        document.body
       )}
     </div>
   );
