@@ -3,6 +3,8 @@ import { db, postsTable, postLikesTable, postCommentsTable, usersTable } from "@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { moderateContent } from "../lib/moderation";
 
+const router = Router();
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function buildPost(postId: number, currentUserId: number) {
