@@ -1,49 +1,21 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, PhoneOff, Video } from "lucide-react";
 import { useAppContext } from "@/contexts/AppContext";
+import { playRingtone, getSelectedRingtone } from "@/lib/ringtones";
 
 export function IncomingCall() {
   const { activeCall, currentUserId, acceptCall, declineCall } = useAppContext();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const visible =
     !!activeCall &&
     activeCall.status === "ringing" &&
     activeCall.callerId !== currentUserId;
 
-  /* Play ringtone via oscillator so no file needed */
   useEffect(() => {
     if (!visible) return;
-
-    let ctx: AudioContext | null = null;
-    let stopped = false;
-
-    const ring = () => {
-      if (stopped) return;
-      ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = 660;
-      gain.gain.value = 0.08;
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.4);
-      osc.onended = () => {
-        ctx?.close();
-        ctx = null;
-        if (!stopped) setTimeout(ring, 1600);
-      };
-    };
-
-    const t = setTimeout(ring, 200);
-    return () => {
-      stopped = true;
-      clearTimeout(t);
-      ctx?.close();
-    };
+    const stop = playRingtone(getSelectedRingtone());
+    return stop;
   }, [visible]);
 
   if (!activeCall || !visible) return null;
@@ -125,7 +97,6 @@ export function IncomingCall() {
 
           {/* Buttons */}
           <div className="flex gap-3 px-6 pb-6">
-            {/* Decline */}
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => declineCall()}
@@ -135,7 +106,6 @@ export function IncomingCall() {
               Отклонить
             </motion.button>
 
-            {/* Accept */}
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => acceptCall()}

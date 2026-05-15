@@ -8,6 +8,7 @@ import {
 import { useAppContext } from "@/contexts/AppContext";
 import { useGetContacts } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { playRingbackTone } from "@/lib/ringtones";
 
 function SoundWaves({ active }: { active: boolean }) {
   return (
@@ -217,6 +218,17 @@ export function ActiveCall() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
+
+  // Ringback tone for outgoing call (caller hears while waiting)
+  useEffect(() => {
+    const isOutgoingRinging =
+      !!activeCall &&
+      activeCall.status === "ringing" &&
+      activeCall.callerId === currentUserId;
+    if (!isOutgoingRinging) return;
+    const stop = playRingbackTone();
+    return stop;
+  }, [activeCall?.id, activeCall?.status, activeCall?.callerId, currentUserId]);
 
   useEffect(() => {
     if (!activeCall || activeCall.status !== "active") return;

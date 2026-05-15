@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useGetMe, useUpdateMe } from "@workspace/api-client-react";
 import { useAppContext } from "@/contexts/AppContext";
+import { RINGTONES, previewRingtone } from "@/lib/ringtones";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -1147,6 +1148,7 @@ export default function Settings() {
   const [notifyCalls, setNotifyCalls] = useState(() => lsb("pulse-notify-calls", true));
   const [notifyPreview, setNotifyPreview] = useState(() => lsb("pulse-notify-preview", true));
   const [notificationSound, setNotificationSound] = useState(() => localStorage.getItem("pulse-notification-sound") || "classic");
+  const [ringtone, setRingtone] = useState(() => localStorage.getItem("pulse-ringtone") || "pulse");
 
   // Privacy
   const [lastSeenVisibility, setLastSeenVisibility] = useState(() => ls("pulse-privacy-last-seen", "everyone"));
@@ -1935,6 +1937,54 @@ export default function Settings() {
                       <BellOff size={13}/> {t("settings.notifyDisabled")}
                     </div>
                   )}
+                </div>
+              </Section>
+
+              {/* Ringtone Picker — available to all users */}
+              <Section
+                title={lang === "ru" ? "Мелодия звонка" : "Ringtone"}
+                icon={<PhoneCall size={13}/>}
+              >
+                <div className="p-4">
+                  <p className="text-xs text-muted-foreground mb-4">
+                    {lang === "ru"
+                      ? "Выберите мелодию для входящих звонков"
+                      : "Choose the ringtone for incoming calls"}
+                  </p>
+                  <div className="space-y-2">
+                    {RINGTONES.map(rt => (
+                      <div
+                        key={rt.id}
+                        className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                          ringtone === rt.id
+                            ? "border-primary bg-primary/8"
+                            : "border-border hover:border-primary/40 bg-secondary/30"
+                        }`}
+                        onClick={() => {
+                          setRingtone(rt.id);
+                          localStorage.setItem("pulse-ringtone", rt.id);
+                          previewRingtone(rt.id);
+                        }}
+                      >
+                        <span className="text-xl shrink-0">{rt.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{rt.label}</p>
+                          <p className="text-xs text-muted-foreground">{rt.desc}</p>
+                        </div>
+                        {ringtone === rt.id ? (
+                          <CheckCircle size={18} className="text-primary shrink-0" />
+                        ) : (
+                          <button
+                            className="p-1.5 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                            onClick={e => { e.stopPropagation(); previewRingtone(rt.id); }}
+                            title={lang === "ru" ? "Прослушать" : "Preview"}
+                          >
+                            <Play size={14}/>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </Section>
 
