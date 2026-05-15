@@ -282,15 +282,41 @@ router.post("/posts/:postId/comments", async (req, res) => {
     const uid = req.currentUserId;
     const postId = Number(req.params.postId);
     const { text } = req.body;
-    if (!text) return res.status(400).json({ error: "text required" });
-    const [comment] = await db.insert(postCommentsTable).values({ postId, userId: uid, text }).returning();
-    const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
-    await db.update(postsTable).set({ commentsCount: (post?.commentsCount ?? 0) + 1 }).where(eq(postsTable.id, postId));
+    if (!text || !String(text).trim()) return res.status(400).json({ error: "text required" });
+    const [comment] = await db.insert(postCommentsTable).values({ postId, userId: uid, text: String(text).trim() }).returning();
+    await db.execute(sql`UPDATE posts SET comments_count = comments_count + 1 WHERE id = ${postId}`);
     const author = await db.query.usersTable.findFirst({ where: eq(usersTable.id, uid) });
     res.status(201).json({ ...comment, author: author ?? null });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/posts/:postId/comments/:commentId", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const postId = Number(req.params.postId);
+    const commentId = Number(req.params.commentId);
+
+    const userRows = await db.execute(sql`SELECT is_admin FROM users WHERE id = ${uid} LIMIT 1`);
+    const isAdmin = (userRows.rows[0] as any)?.is_admin === true;
+
+    const rows = await db.execute(
+      sql`SELECT id, user_id FROM post_comments WHERE id = ${commentId} AND post_id = ${postId} LIMIT 1`
+    );
+    const comment = rows.rows[0] as any;
+    if (!comment) return res.status(404).json({ error: "Комментарий не найден" });
+    if (comment.user_id !== uid && !isAdmin) {
+      return res.status(403).json({ error: "Нет прав для удаления" });
+    }
+
+    await db.execute(sql`DELETE FROM post_comments WHERE id = ${commentId}`);
+    await db.execute(sql`UPDATE posts SET comments_count = GREATEST(0, comments_count - 1) WHERE id = ${postId}`);
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
   }
 });
 

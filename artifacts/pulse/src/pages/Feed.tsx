@@ -1,10 +1,11 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useGetPosts, useGetMe, useCreatePost, useLikePost, useCreatePostComment, useGetPostComments, Post } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Heart, MessageCircle, Send, Image, X, Plus, Trash2, MoreVertical, ZoomIn, ShieldAlert, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { Heart, MessageCircle, Send, Image, X, Plus, Trash2, MoreVertical, ZoomIn, ShieldAlert, AlertCircle, CheckCircle2, Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { formatDistanceToNow as fDTN } from "date-fns";
+import { ru } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
-import { formatDistanceToNow } from "date-fns";
 import { useLocation } from "wouter";
 import {
   DropdownMenu,
@@ -184,7 +185,7 @@ function BlockedPostCard({ post, onAppealSubmitted }: { post: any; onAppealSubmi
           </button>
           <div className="flex-1 min-w-0 opacity-60">
             <p className="font-semibold text-sm truncate">{post.author?.displayName || "Unknown"}</p>
-            <p className="text-xs text-muted-foreground">@{post.author?.username} · {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}</p>
+            <p className="text-xs text-muted-foreground">@{post.author?.username} · {fDTN(new Date(post.createdAt), { addSuffix: true, locale: ru })}</p>
           </div>
         </div>
 
@@ -239,15 +240,185 @@ function BlockedPostCard({ post, onAppealSubmitted }: { post: any; onAppealSubmi
   );
 }
 
+const getAuthHeader = () => {
+  const t = sessionStorage.getItem("pulse-token");
+  return t ? { "Authorization": `Bearer ${t}` } : {};
+};
+
+function CommentThread({ post, onCountChange }: { post: any; onCountChange: (n: number) => void }) {
+  const [commentText, setCommentText] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const createComment = useCreatePostComment();
+  const { data: me } = useGetMe();
+  const currentUserId = getCurrentUserId();
+  const [, setLocation] = useLocation();
+
+  const { data: comments = [], refetch: refetchComments, isLoading } = useGetPostComments(post.id, {} as any);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+    const text = commentText.trim();
+    setCommentText("");
+    createComment.mutate({ postId: post.id, data: { text } }, {
+      onSuccess: () => {
+        refetchComments();
+        queryClient.setQueryData(["/api/posts"], (old: any) =>
+          Array.isArray(old)
+            ? old.map((p: any) => p.id === post.id ? { ...p, commentsCount: (p.commentsCount || 0) + 1 } : p)
+            : old
+        );
+        onCountChange((post.commentsCount || 0) + 1);
+      }
+    });
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    setDeletingId(commentId);
+    try {
+      await fetch(`/api/posts/${post.id}/comments/${commentId}`, {
+        method: "DELETE",
+        headers: getAuthHeader(),
+      });
+      await refetchComments();
+      queryClient.setQueryData(["/api/posts"], (old: any) =>
+        Array.isArray(old)
+          ? old.map((p: any) => p.id === post.id ? { ...p, commentsCount: Math.max(0, (p.commentsCount || 0) - 1) } : p)
+          : old
+      );
+      onCountChange(Math.max(0, (post.commentsCount || 0) - 1));
+    } catch {}
+    setDeletingId(null);
+  };
+
+  const isAdmin = (me as any)?.isAdmin === true;
+
+  return (
+    <div className="border-t border-border bg-secondary/20">
+      <div className="px-4 pt-3 pb-1 flex items-center gap-2">
+        <MessageCircle size={14} className="text-primary" />
+        <span className="text-xs font-bold text-foreground uppercase tracking-wider">Комментарии</span>
+        <span className="text-[11px] text-muted-foreground font-medium">
+          {Array.isArray(comments) ? comments.length : 0}
+        </span>
+      </div>
+
+      <div className="px-4 pb-3 space-y-2.5 max-h-80 overflow-y-auto">
+        {isLoading ? (
+          <div className="space-y-2 py-1">
+            {[1, 2].map(i => (
+              <div key={i} className="flex gap-2 animate-pulse">
+                <div className="w-7 h-7 rounded-full bg-secondary shrink-0" />
+                <div className="flex-1 bg-secondary rounded-xl h-12" />
+              </div>
+            ))}
+          </div>
+        ) : !Array.isArray(comments) || comments.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-3">
+            Будьте первым, кто оставит комментарий
+          </p>
+        ) : (
+          (comments as any[]).map((comment: any) => {
+            const isOwn = comment.userId === currentUserId || comment.user_id === currentUserId;
+            const canDel = isOwn || isAdmin;
+            return (
+              <motion.div
+                key={comment.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-2 group"
+              >
+                <button
+                  onClick={() => comment.author?.id && setLocation(`/user/${comment.author.id}`)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden hover:opacity-80 transition-opacity"
+                  style={{ backgroundColor: comment.author?.avatarColor || "#333" }}
+                >
+                  {comment.author?.avatarUrl ? (
+                    <img src={comment.author.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (comment.author?.displayName || "U")[0].toUpperCase()
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="bg-secondary rounded-xl px-3 py-2 relative">
+                    <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                      <button
+                        onClick={() => comment.author?.id && setLocation(`/user/${comment.author.id}`)}
+                        className="text-xs font-bold hover:text-primary transition-colors truncate max-w-[130px]"
+                      >
+                        {comment.author?.displayName || "Unknown"}
+                      </button>
+                      {comment.author?.isVerified && <VerifiedBadge />}
+                      {comment.author?.isAdmin === true && <AdminBadge />}
+                      <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                        {fDTN(new Date(comment.createdAt), { addSuffix: true, locale: ru })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-foreground leading-relaxed break-words">{comment.text}</p>
+                  </div>
+                </div>
+                {canDel && (
+                  <button
+                    onClick={() => handleDeleteComment(comment.id)}
+                    disabled={deletingId === comment.id}
+                    className="opacity-0 group-hover:opacity-100 self-start mt-1 p-1 text-muted-foreground hover:text-destructive rounded-lg hover:bg-destructive/10 transition-all disabled:opacity-30 shrink-0"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="px-4 pb-4">
+        <form onSubmit={handleComment} className="flex gap-2 items-center">
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden"
+            style={{ backgroundColor: (me as any)?.avatarColor || "#3B82F6" }}
+          >
+            {(me as any)?.avatarUrl ? (
+              <img src={(me as any).avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              ((me as any)?.displayName || "U")[0].toUpperCase()
+            )}
+          </div>
+          <input
+            ref={inputRef}
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Написать комментарий..."
+            maxLength={500}
+            className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-primary/50 transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={!commentText.trim() || createComment.isPending}
+            className="p-2 bg-primary text-primary-foreground rounded-xl disabled:opacity-40 hover:bg-primary/90 transition-colors shrink-0"
+          >
+            <Send size={14} />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function PostCard({ post, onAppealSubmitted }: { post: Post & { appeal?: any; moderationStatus?: string; moderationReason?: string }; onAppealSubmitted?: () => void }) {
   const [showComments, setShowComments] = useState(false);
-  const [commentText, setCommentText] = useState("");
+  const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const likePost = useLikePost();
-  const createComment = useCreatePostComment();
   const { data: me } = useGetMe();
   const currentUserId = getCurrentUserId();
 
@@ -261,6 +432,7 @@ function PostCard({ post, onAppealSubmitted }: { post: Post & { appeal?: any; mo
   if (isBlocked) return null;
 
   const canDelete = post.author?.id === currentUserId || (me as any)?.isAdmin === true;
+  const displayCommentCount = localCommentCount !== null ? localCommentCount : (post.commentsCount ?? 0);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -274,10 +446,6 @@ function PostCard({ post, onAppealSubmitted }: { post: Post & { appeal?: any; mo
     setIsDeleting(false);
   };
 
-  const { data: comments, refetch: refetchComments } = useGetPostComments(post.id, {
-    query: { enabled: showComments } as any
-  });
-
   const handleLike = () => {
     queryClient.setQueryData(["/api/posts"], (old: any) => {
       if (!Array.isArray(old)) return old;
@@ -288,21 +456,7 @@ function PostCard({ post, onAppealSubmitted }: { post: Post & { appeal?: any; mo
       });
     });
     likePost.mutate({ postId: post.id }, {
-      onError: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
-      }
-    });
-  };
-
-  const handleComment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!commentText.trim()) return;
-    createComment.mutate({ postId: post.id, data: { text: commentText } }, {
-      onSuccess: () => {
-        setCommentText("");
-        refetchComments();
-        queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
-      }
+      onError: () => queryClient.invalidateQueries({ queryKey: ["/api/posts"] })
     });
   };
 
@@ -346,7 +500,7 @@ function PostCard({ post, onAppealSubmitted }: { post: Post & { appeal?: any; mo
               {isAdmin && <AdminBadge />}
             </div>
             <p className="text-xs text-muted-foreground truncate">
-              @{post.author?.username} · {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+              @{post.author?.username} · {fDTN(new Date(post.createdAt), { addSuffix: true, locale: ru })}
             </p>
           </div>
           {canDelete && (
@@ -383,76 +537,53 @@ function PostCard({ post, onAppealSubmitted }: { post: Post & { appeal?: any; mo
           </div>
         )}
 
-        <div className="flex items-center gap-4 px-4 py-3 border-t border-border">
+        <div className="flex items-center gap-1 px-4 py-2.5 border-t border-border">
           <button
             onClick={handleLike}
-            className={`flex items-center gap-1.5 text-sm transition-colors group ${
+            className={`flex items-center gap-1.5 text-sm transition-colors group px-2.5 py-1.5 rounded-xl hover:bg-red-500/10 ${
               post.isLiked ? "text-red-500" : "text-muted-foreground hover:text-red-500"
             }`}
           >
             <Heart
-              size={18}
+              size={17}
               className={`transition-transform group-hover:scale-110 ${post.isLiked ? "fill-current" : ""}`}
             />
-            <span className="font-medium">{post.likesCount}</span>
+            <span className="font-semibold text-xs">{post.likesCount}</span>
           </button>
+
           <button
-            onClick={() => setShowComments(!showComments)}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors group"
+            onClick={() => setShowComments(v => !v)}
+            className={`flex items-center gap-1.5 text-sm transition-all group px-2.5 py-1.5 rounded-xl hover:bg-primary/10 ${
+              showComments ? "text-primary bg-primary/8" : "text-muted-foreground hover:text-primary"
+            }`}
           >
-            <MessageCircle size={18} className="transition-transform group-hover:scale-110" />
-            <span className="font-medium">{post.commentsCount}</span>
+            <MessageCircle
+              size={17}
+              className={`transition-transform group-hover:scale-110 ${showComments ? "fill-primary/20" : ""}`}
+            />
+            <span className="font-semibold text-xs">{displayCommentCount}</span>
+            <span className="text-[11px] font-medium hidden sm:inline">Комментарии</span>
+            {showComments
+              ? <ChevronUp size={13} className="opacity-60" />
+              : <ChevronDown size={13} className="opacity-60" />
+            }
           </button>
         </div>
 
         <AnimatePresence>
           {showComments && (
             <motion.div
+              key="comments"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden border-t border-border"
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
             >
-              <div className="p-4 space-y-3">
-                {comments?.map((comment: any) => (
-                  <div key={comment.id} className="flex gap-2">
-                    <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 overflow-hidden"
-                      style={{ backgroundColor: (comment.author as any)?.avatarColor || "#333" }}
-                    >
-                      {(comment.author as any)?.avatarUrl ? (
-                        <img src={(comment.author as any).avatarUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        ((comment.author as any)?.displayName || "U")[0].toUpperCase()
-                      )}
-                    </div>
-                    <div className="flex-1 bg-secondary rounded-xl px-3 py-2">
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <span className="text-xs font-semibold truncate max-w-[120px]">{(comment.author as any)?.displayName}</span>
-                        {(comment.author as any)?.isVerified && <VerifiedBadge />}
-                        {(comment.author as any)?.isAdmin === true && <AdminBadge />}
-                      </div>
-                      <p className="text-xs text-foreground">{comment.text}</p>
-                    </div>
-                  </div>
-                ))}
-
-                <form onSubmit={handleComment} className="flex gap-2 mt-2">
-                  <input
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    placeholder="Написать комментарий..."
-                    className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-primary/50 transition-colors"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!commentText.trim() || createComment.isPending}
-                    className="p-2 bg-primary text-primary-foreground rounded-xl disabled:opacity-50 hover:bg-primary/90 transition-colors"
-                  >
-                    <Send size={16} />
-                  </button>
-                </form>
-              </div>
+              <CommentThread
+                post={{ ...post, commentsCount: displayCommentCount }}
+                onCountChange={setLocalCommentCount}
+              />
             </motion.div>
           )}
         </AnimatePresence>
