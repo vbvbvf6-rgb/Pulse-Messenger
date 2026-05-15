@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useMemo } from "react";
 import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useInitiateCall, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
 import { useP2PChannel } from "@/hooks/useP2PChannel";
 import { useNotifications } from "@/hooks/useNotifications";
-import { Phone, Video, MoreVertical, ArrowLeft, Search, BellOff, Bell, Pin, PinOff, User, Trash2, X, Timer, Flame, ChevronRight, ChevronDown, ChevronUp, Settings, Crown, Palette, Check, Sparkles, Lock, MessageSquare, Users } from "lucide-react";
+import { Phone, Video, MoreVertical, ArrowLeft, Search, BellOff, Bell, Pin, PinOff, User, Trash2, X, Timer, Flame, ChevronRight, ChevronDown, ChevronUp, Settings, Crown, Palette, Check, Sparkles, Lock, MessageSquare, Users, Megaphone } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChatInfoPanel } from "./ChatInfoPanel";
 import { useAppContext } from "@/contexts/AppContext";
@@ -13,6 +13,7 @@ import { ChatInput } from "./ChatInput";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -325,6 +326,10 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const [smartReplyPending, setSmartReplyPending] = useState(false);
   const [pinnedMsgDismissed, setPinnedMsgDismissed] = useState<number | null>(null);
   const [pinnedMsgIndex, setPinnedMsgIndex] = useState<number>(0);
+  const [announcementDismissed, setAnnouncementDismissed] = useState<boolean>(() => {
+    if (!chatId) return false;
+    return sessionStorage.getItem(`ann-dismissed-${chatId}`) === "1";
+  });
   const [replyChipText, setReplyChipText] = useState<string | null>(null);
   const [typingOutMsgId, setTypingOutMsgId] = useState<number | null>(null);
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
@@ -426,6 +431,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     setShowAutoDeleteMenu(false);
     setBotTyping(false);
     setTypingUsers([]);
+    setAnnouncementDismissed(sessionStorage.getItem(`ann-dismissed-${chatId}`) === "1");
     setTypingForChat(chatId, []);
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
   }, [chatId]);
@@ -646,6 +652,26 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const otherUserIsPlus   = chat.type === "direct" && (chat.otherUser as any)?.primeTier === "prime_plus";
   const autoDeleteLabel = formatAutoDeleteLabel(autoDeleteTimer);
 
+  // Last admin/owner message used as channel announcement
+  const adminUserIds = useMemo(() => {
+    if (!isChannel) return new Set<number>();
+    return new Set<number>(
+      ((chat.members as any[]) || [])
+        .filter((m: any) => m.role === "owner" || m.role === "admin")
+        .map((m: any) => m.userId)
+    );
+  }, [isChannel, chat.members]);
+
+  const lastAdminMessage = useMemo(() => {
+    if (!isChannel || !messages || adminUserIds.size === 0) return null;
+    const msgs = messages as Message[];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i] as any;
+      if (adminUserIds.has(m.senderId) && m.type === "text" && m.text) return m;
+    }
+    return null;
+  }, [isChannel, messages, adminUserIds]);
+
   return (
     <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden z-30">
       {/* Header */}
@@ -865,6 +891,86 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
           </DropdownMenu>
         </div>
       </header>
+
+      {/* Channel Announcement Banner — last admin/owner message */}
+      <AnimatePresence>
+        {isChannel && lastAdminMessage && !announcementDismissed && (
+          <motion.div
+            key="announcement-banner"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="shrink-0 overflow-hidden z-10"
+          >
+            <div
+              className="relative px-4 py-3.5 border-b border-border overflow-hidden cursor-pointer"
+              style={{
+                background: "linear-gradient(135deg, rgba(255,80,0,0.12) 0%, rgba(255,140,0,0.08) 50%, rgba(255,80,0,0.05) 100%)",
+              }}
+              onClick={() => {
+                const el = messageRefs.current[lastAdminMessage.id];
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+            >
+              {/* Subtle glow line at top */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+
+              <div className="flex items-start gap-3">
+                {/* Icon */}
+                <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0 mt-0.5">
+                  <Megaphone size={15} className="text-primary" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {/* Label row */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-primary">
+                      Объявление
+                    </span>
+                    {/* Admin avatar + name */}
+                    <div className="flex items-center gap-1 ml-auto">
+                      <div
+                        className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black text-white shrink-0"
+                        style={{ backgroundColor: lastAdminMessage.sender?.avatarColor || "#555" }}
+                      >
+                        {lastAdminMessage.sender?.avatarUrl ? (
+                          <img src={lastAdminMessage.sender.avatarUrl} alt="" className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          (lastAdminMessage.sender?.displayName || "A")[0].toUpperCase()
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-semibold truncate max-w-[80px]">
+                        {lastAdminMessage.sender?.displayName || "Администратор"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/60">
+                        · {format(new Date(lastAdminMessage.createdAt), "d MMM, HH:mm")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Message text — up to 2 lines */}
+                  <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2">
+                    {lastAdminMessage.text}
+                  </p>
+                </div>
+
+                {/* Dismiss */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sessionStorage.setItem(`ann-dismissed-${chatId}`, "1");
+                    setAnnouncementDismissed(true);
+                  }}
+                  className="w-6 h-6 rounded-lg hover:bg-primary/10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Pinned messages banner — supports up to 10 (Prime+) */}
       {(() => {
