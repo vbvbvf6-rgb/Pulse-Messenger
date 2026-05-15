@@ -387,6 +387,13 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     es.addEventListener("messages-read", () => {
       // Someone read messages in this chat — re-fetch so sender's ✓ → ✓✓
       queryClient.invalidateQueries({ queryKey: getGetMessagesQueryKey({ chatId }) });
+      queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() });
+    });
+
+    es.addEventListener("messages-delivered", () => {
+      // Recipient device received messages — update ✓ → ✓✓ (gray)
+      queryClient.invalidateQueries({ queryKey: getGetMessagesQueryKey({ chatId }) });
+      queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() });
     });
 
     es.addEventListener("typing", (e: MessageEvent) => {

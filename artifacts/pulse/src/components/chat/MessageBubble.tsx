@@ -997,13 +997,33 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
                   <span className="uppercase tracking-wider">ред.</span>
                 )}
                 <span>{formatTime(message.createdAt)}</span>
-                {isMine && (
-                  isPending
-                    ? <Clock size={13} className="opacity-55" />
+                {isMine && (() => {
+                  const isDelivered = (message as any).isDelivered;
+                  const label = isPending
+                    ? "Отправляется…"
                     : message.isRead
-                      ? <CheckCheck size={15} strokeWidth={2.5} className="text-blue-200/90" />
-                      : <Check size={15} strokeWidth={2.5} className="opacity-70" />
-                )}
+                      ? "Прочитано"
+                      : isDelivered
+                        ? "Доставлено"
+                        : "Отправлено";
+                  return (
+                    <div className="relative group/receipt cursor-default">
+                      {isPending
+                        ? <Clock size={13} className="opacity-55" />
+                        : message.isRead
+                          ? <CheckCheck size={15} strokeWidth={2.5} className="text-blue-200/90" />
+                          : isDelivered
+                            ? <CheckCheck size={15} strokeWidth={2.5} className="opacity-50" />
+                            : <Check size={15} strokeWidth={2.5} className="opacity-70" />
+                      }
+                      <div className="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover/receipt:block z-50">
+                        <div className="bg-popover text-popover-foreground border border-border text-[10px] font-semibold px-2 py-1 rounded-lg shadow-lg whitespace-nowrap">
+                          {label}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

@@ -375,6 +375,15 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
         try {
           const data = JSON.parse(e.data);
           window.dispatchEvent(new CustomEvent("pulse:new-message", { detail: data }));
+          // Auto-deliver: tell the server the message reached this device
+          // (even if the chat isn't open — upgrades ✓ sent → ✓✓ gray delivered)
+          const token = sessionStorage.getItem("pulse-token");
+          if (token && data.chatId) {
+            fetch(`/api/chats/${data.chatId}/deliver`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => {});
+          }
         } catch {}
       });
 

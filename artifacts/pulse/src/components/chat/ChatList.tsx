@@ -525,6 +525,7 @@ export function ChatList() {
                             const age = Date.now() - new Date(lastMessage.createdAt).getTime();
                             if (age < 1500) return <Clock size={12} className="text-muted-foreground opacity-60" />;
                             if (lastMessage.isRead) return <CheckCheck size={14} strokeWidth={2.5} className="text-primary" />;
+                            if ((lastMessage as any).isDelivered) return <CheckCheck size={14} strokeWidth={2.5} className="text-muted-foreground opacity-55" />;
                             return <Check size={14} strokeWidth={2.5} className="text-muted-foreground opacity-70" />;
                           })()}
                           <span className={cn(

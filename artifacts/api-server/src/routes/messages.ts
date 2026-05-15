@@ -202,11 +202,17 @@ router.get("/messages", async (req, res) => {
 
     // Compute isRead dynamically: a message sent by the current user is "read"
     // if at least one OTHER chat member has lastReadAt >= message.createdAt
-    const otherMembers = await db.select({ lastReadAt: chatMembersTable.lastReadAt })
-      .from(chatMembersTable)
+    const otherMembers = await db.select({
+      lastReadAt: chatMembersTable.lastReadAt,
+      lastDeliveredAt: chatMembersTable.lastDeliveredAt,
+    }).from(chatMembersTable)
       .where(and(eq(chatMembersTable.chatId, chatId), ne(chatMembersTable.userId, uid)));
     const maxOtherLastRead = otherMembers.reduce((max, m) => {
       const t = m.lastReadAt ? new Date(m.lastReadAt).getTime() : 0;
+      return t > max ? t : max;
+    }, 0);
+    const maxOtherLastDelivered = otherMembers.reduce((max, m) => {
+      const t = m.lastDeliveredAt ? new Date(m.lastDeliveredAt).getTime() : 0;
       return t > max ? t : max;
     }, 0);
 
@@ -214,9 +220,11 @@ router.get("/messages", async (req, res) => {
       const msg = await buildMessage(m, isPrimePlus);
       if (m.senderId === uid) {
         msg.isRead = maxOtherLastRead >= new Date(m.createdAt).getTime();
+        (msg as any).isDelivered = maxOtherLastDelivered >= new Date(m.createdAt).getTime();
       } else {
         // Messages from others are always "seen" by the viewer
         msg.isRead = true;
+        (msg as any).isDelivered = true;
       }
       return msg;
     }));

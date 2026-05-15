@@ -84,7 +84,18 @@ async function buildChat(chatId: number, currentUserId: number) {
   if (lastMessageRow) {
     const sender = await db.query.usersTable.findFirst({ where: eq(usersTable.id, lastMessageRow.senderId) });
     const reactions = await db.select().from(reactionsTable).where(eq(reactionsTable.messageId, lastMessageRow.id));
-    lastMessage = { ...lastMessageRow, sender, reactions };
+    // Compute isRead / isDelivered for the lastMessage (from perspective of currentUserId)
+    const otherMembers2 = await db.select({
+      lastReadAt: chatMembersTable.lastReadAt,
+      lastDeliveredAt: chatMembersTable.lastDeliveredAt,
+    }).from(chatMembersTable)
+      .where(and(eq(chatMembersTable.chatId, chatId), ne(chatMembersTable.userId, currentUserId)));
+    const msgTime = new Date(lastMessageRow.createdAt).getTime();
+    const maxRead2 = otherMembers2.reduce((mx, m) => Math.max(mx, m.lastReadAt ? new Date(m.lastReadAt).getTime() : 0), 0);
+    const maxDel2  = otherMembers2.reduce((mx, m) => Math.max(mx, m.lastDeliveredAt ? new Date(m.lastDeliveredAt).getTime() : 0), 0);
+    const lmIsRead      = lastMessageRow.senderId === currentUserId ? maxRead2 >= msgTime : true;
+    const lmIsDelivered = lastMessageRow.senderId === currentUserId ? maxDel2  >= msgTime : true;
+    lastMessage = { ...lastMessageRow, sender, reactions, isRead: lmIsRead, isDelivered: lmIsDelivered };
   }
 
   let unreadCount = 0;
@@ -375,10 +386,27 @@ router.post("/chats/:chatId/read", async (req, res) => {
     const chatId = Number(req.params.chatId);
     const now = new Date();
     await db.update(chatMembersTable)
-      .set({ lastReadAt: now })
+      .set({ lastReadAt: now, lastDeliveredAt: now })
       .where(and(eq(chatMembersTable.chatId, chatId), eq(chatMembersTable.userId, uid)));
     // Broadcast to all chat members so senders see their checkmarks flip to ✓✓
     broadcastToChat(chatId, "messages-read", { chatId, readerId: uid, readAt: now.toISOString() });
+    res.status(204).send();
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Mark messages as delivered (recipient received them but hasn't opened chat yet)
+router.post("/chats/:chatId/deliver", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const chatId = Number(req.params.chatId);
+    const now = new Date();
+    await db.update(chatMembersTable)
+      .set({ lastDeliveredAt: now })
+      .where(and(eq(chatMembersTable.chatId, chatId), eq(chatMembersTable.userId, uid)));
+    broadcastToChat(chatId, "messages-delivered", { chatId, deliveredBy: uid, deliveredAt: now.toISOString() });
     res.status(204).send();
   } catch (err) {
     req.log.error(err);
