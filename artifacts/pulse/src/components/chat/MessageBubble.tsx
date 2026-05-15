@@ -335,9 +335,36 @@ export interface MessageBubbleProps {
   onPin?: (msg: Message) => void;
   typingOut?: boolean;
   onTypingDone?: () => void;
+  searchHighlight?: string;
+  isActiveMatch?: boolean;
+  messageRef?: React.RefCallback<HTMLDivElement>;
 }
 
-export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin, typingOut, onTypingDone }: MessageBubbleProps) {
+function HighlightText({ text, query, isMine }: { text: string; query: string; isMine: boolean }) {
+  if (!query.trim()) return <>{text}</>;
+  const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <mark
+            key={i}
+            className={cn(
+              "rounded px-[1px] font-black",
+              isMine ? "bg-white/30 text-white" : "bg-yellow-400/40 text-foreground"
+            )}
+          >
+            {part}
+          </mark>
+        ) : (
+          <React.Fragment key={i}>{part}</React.Fragment>
+        )
+      )}
+    </>
+  );
+}
+
+export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin, typingOut, onTypingDone, searchHighlight, isActiveMatch, messageRef }: MessageBubbleProps) {
   const { currentUserId } = useAppContext();
   const { data: me } = useGetMe();
   const queryClient = useQueryClient();
@@ -722,7 +749,9 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
         return (
           <div>
             <p className="text-[15px] whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-snug font-medium">
-              {visibleText}
+              {searchHighlight
+                ? <HighlightText text={visibleText} query={searchHighlight} isMine={isMine} />
+                : visibleText}
               {isAnimating && (
                 <span className="inline-block w-[2px] h-[14px] ml-[2px] mb-[-2px] align-middle rounded-sm animate-pulse" style={{ background: isMine ? "rgba(255,255,255,0.7)" : "currentColor", opacity: 0.7 }} />
               )}
@@ -827,9 +856,14 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
   return (
     <>
       <motion.div
+        ref={messageRef}
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className={cn("flex w-full group select-none relative", isMine ? "justify-end" : "justify-start")}
+        className={cn(
+          "flex w-full group select-none relative",
+          isMine ? "justify-end" : "justify-start",
+          isActiveMatch && "rounded-2xl ring-2 ring-yellow-400/60 ring-offset-2 ring-offset-background"
+        )}
       >
         <div className={cn(
           "flex max-w-[85%] md:max-w-[70%]",
