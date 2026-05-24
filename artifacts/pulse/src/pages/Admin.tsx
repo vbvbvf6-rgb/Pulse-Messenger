@@ -221,12 +221,22 @@ export default function Admin() {
 
   // Banwords
   interface Banword { id: number; word: string; created_at: string; }
+  interface ScanFlagged {
+    id: number; text: string; chatId: number; senderId: number;
+    senderName: string; senderUsername: string; avatarColor: string; avatarUrl: string | null;
+    createdAt: string; reason: string; categories: string[];
+  }
   const [banwords, setBanwordsState] = useState<Banword[]>([]);
   const [banwordsLoading, setBanwordsLoading] = useState(false);
   const [showBanwords, setShowBanwords] = useState(false);
   const [newBanword, setNewBanword] = useState("");
   const [addingBanword, setAddingBanword] = useState(false);
   const [deletingBanwordId, setDeletingBanwordId] = useState<number | null>(null);
+  const [importingFromWeb, setImportingFromWeb] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanResults, setScanResults] = useState<{ scanned: number; flagged: ScanFlagged[] } | null>(null);
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [deletingScannedId, setDeletingScannedId] = useState<number | null>(null);
 
   // Support Bugs
   interface AdminBugReport {
@@ -1044,6 +1054,60 @@ export default function Admin() {
       else showToast("Ошибка", "err");
     } catch { showToast("Ошибка соединения", "err"); }
     setDeletingBanwordId(null);
+  };
+
+  const handleImportFromWeb = async () => {
+    setImportingFromWeb(true);
+    try {
+      const res = await fetch("/api/admin/banwords/import-from-web", {
+        method: "POST",
+        headers: getHeader(),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`✅ Добавлено ${data.added} слов (${data.fromInternet > 0 ? `+${data.fromInternet} из интернета` : "встроенный список"})`, "ok");
+        fetchBanwords();
+      } else {
+        showToast(data.error || "Ошибка импорта", "err");
+      }
+    } catch { showToast("Ошибка соединения", "err"); }
+    setImportingFromWeb(false);
+  };
+
+  const handleScanMessages = async () => {
+    setScanning(true);
+    try {
+      const res = await fetch("/api/admin/banwords/scan-messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ limit: 500 }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setScanResults(data);
+        setShowScanModal(true);
+      } else {
+        showToast(data.error || "Ошибка сканирования", "err");
+      }
+    } catch { showToast("Ошибка соединения", "err"); }
+    setScanning(false);
+  };
+
+  const handleDeleteScanned = async (id: number) => {
+    setDeletingScannedId(id);
+    try {
+      const res = await fetch(`/api/admin/banwords/scan-delete/${id}`, {
+        method: "DELETE",
+        headers: getHeader(),
+      });
+      if (res.ok) {
+        setScanResults(prev => prev ? { ...prev, flagged: prev.flagged.filter(f => f.id !== id) } : null);
+        showToast("Сообщение удалено", "ok");
+      } else {
+        showToast("Ошибка удаления", "err");
+      }
+    } catch { showToast("Ошибка соединения", "err"); }
+    setDeletingScannedId(null);
   };
 
   const filtered = users.filter(u =>
@@ -2478,6 +2542,107 @@ export default function Admin() {
           </div>
         </div>
 
+        {/* Scan Results Modal */}
+        <AnimatePresence>
+          {showScanModal && scanResults && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+              onClick={e => { if (e.target === e.currentTarget) setShowScanModal(false); }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="bg-card border border-border rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl"
+              >
+                {/* Header */}
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
+                    <ShieldAlert size={18} className="text-orange-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm">Результаты сканирования ленты</p>
+                    <p className="text-xs text-muted-foreground">
+                      Проверено {scanResults.scanned} сообщений · Найдено нарушений: <span className={scanResults.flagged.length > 0 ? "text-red-400 font-bold" : "text-green-400 font-bold"}>{scanResults.flagged.length}</span>
+                    </p>
+                  </div>
+                  <button onClick={() => setShowScanModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {scanResults.flagged.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center">
+                        <ShieldCheck size={26} className="text-green-400" />
+                      </div>
+                      <p className="font-bold text-foreground">Нарушений не найдено</p>
+                      <p className="text-xs text-muted-foreground">Все проверенные сообщения соответствуют правилам</p>
+                    </div>
+                  ) : (
+                    scanResults.flagged.map(item => (
+                      <div key={item.id} className="flex gap-3 p-3 rounded-xl bg-secondary/40 border border-red-500/10 hover:border-red-500/30 transition-colors">
+                        {/* Avatar */}
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-black shrink-0 overflow-hidden mt-0.5"
+                          style={{ backgroundColor: item.avatarColor || "#6366f1" }}
+                        >
+                          {item.avatarUrl ? (
+                            <img src={item.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            (item.senderName || "?")[0].toUpperCase()
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="text-xs font-bold text-foreground">{item.senderName}</span>
+                            <span className="text-[10px] text-muted-foreground">@{item.senderUsername}</span>
+                            <span className="text-[10px] text-muted-foreground ml-auto shrink-0">{new Date(item.createdAt).toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                          </div>
+                          <p className="text-xs text-foreground/90 leading-relaxed mb-1.5 break-words line-clamp-3">{item.text}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-semibold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">
+                              {item.reason}
+                            </span>
+                            {item.categories.map(c => (
+                              <span key={c} className="text-[9px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full uppercase tracking-wide">{c}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteScanned(item.id)}
+                          disabled={deletingScannedId === item.id}
+                          className="p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 shrink-0 self-start mt-0.5"
+                          title="Удалить сообщение"
+                        >
+                          {deletingScannedId === item.id ? (
+                            <RefreshCw size={13} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={13} />
+                          )}
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {scanResults.flagged.length > 0 && (
+                  <div className="px-4 py-3 border-t border-border shrink-0">
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      Нажмите <Trash2 size={10} className="inline" /> чтобы удалить отдельное сообщение · ИИ-модерация работает автоматически при отправке
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Banwords */}
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <button
@@ -2489,9 +2654,9 @@ export default function Admin() {
                 <Ban size={18} className="text-red-400" />
               </div>
               <div className="text-left">
-                <p className="font-semibold text-sm">Банворды</p>
+                <p className="font-semibold text-sm">Банворды и ИИ-фильтр</p>
                 <p className="text-xs text-muted-foreground">
-                  Запрещённые слова — блокируют публикацию сообщений и историй
+                  Запрещённые слова + нейросеть блокируют нарушения
                   {banwords.length > 0 && ` · ${banwords.length} слов`}
                 </p>
               </div>
@@ -2500,13 +2665,41 @@ export default function Admin() {
           </button>
           {showBanwords && (
             <div className="border-t border-border">
+              {/* Action buttons */}
+              <div className="p-3 border-b border-border flex gap-2 flex-wrap">
+                <button
+                  onClick={handleImportFromWeb}
+                  disabled={importingFromWeb}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 text-xs font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {importingFromWeb ? <RefreshCw size={13} className="animate-spin" /> : <Activity size={13} />}
+                  {importingFromWeb ? "Загрузка..." : "Загрузить из интернета"}
+                </button>
+                <button
+                  onClick={handleScanMessages}
+                  disabled={scanning}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 text-xs font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {scanning ? <RefreshCw size={13} className="animate-spin" /> : <ShieldAlert size={13} />}
+                  {scanning ? "Сканирование..." : "Сканировать ленту"}
+                </button>
+                {scanResults && (
+                  <button
+                    onClick={() => setShowScanModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-secondary text-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors"
+                  >
+                    <FileText size={13} />
+                    Результаты ({scanResults.flagged.length})
+                  </button>
+                )}
+              </div>
               {/* Add form */}
               <div className="p-3 border-b border-border flex gap-2">
                 <input
                   value={newBanword}
                   onChange={e => setNewBanword(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleAddBanword()}
-                  placeholder="Введите слово..."
+                  placeholder="Добавить слово вручную..."
                   className="flex-1 text-sm bg-background border border-border rounded-xl px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
                 />
                 <button
@@ -2527,7 +2720,10 @@ export default function Admin() {
                     </div>
                   ))
                 ) : banwords.length === 0 ? (
-                  <p className="text-center text-muted-foreground text-sm py-8">Список пуст</p>
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <p>Список пуст</p>
+                    <p className="text-xs mt-1 text-muted-foreground/60">Нажмите «Загрузить из интернета» для авто-заполнения</p>
+                  </div>
                 ) : banwords.map(bw => (
                   <div key={bw.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-secondary/30 transition-colors group">
                     <span className="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">

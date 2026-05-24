@@ -2,8 +2,8 @@ import { Router } from "express";
 import { db, usersTable, messagesTable, chatsTable, chatMembersTable, giftsTable, callsTable, banwordsTable } from "@workspace/db";
 import { eq, sql, ne } from "drizzle-orm";
 import { createHash } from "node:crypto";
-import { moderateContent } from "../lib/moderation";
-import { invalidateBanwordsCache } from "../lib/banwords";
+import { moderateContent, localModerationCheck } from "../lib/moderation";
+import { invalidateBanwordsCache, getBanwords, findBanword } from "../lib/banwords";
 
 const router = Router();
 
@@ -1014,6 +1014,153 @@ router.delete("/admin/banwords/:id", requireAdmin, async (req, res) => {
     const id = Number(req.params.id);
     await db.execute(sql`DELETE FROM banwords WHERE id = ${id}`);
     invalidateBanwordsCache();
+    res.status(204).send();
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка сервера" });
+  }
+});
+
+// Hardcoded comprehensive profanity preset (RU + EN)
+const PRESET_BANWORDS = [
+  // Russian mat
+  "хуй","хуя","хуе","хую","хуям","хуйня","хуйло","нахуй","похуй","захуярить",
+  "пизда","пизды","пизде","пизду","пиздец","пиздить","пиздёж","пиздун","пиздюк","пиздобол",
+  "блядь","бляди","блядский","бляд","блять","бля",
+  "ебать","ебал","ебаный","ёбаный","еблан","ёблан","ёб","ёбать","ебись",
+  "сука","суки","сучка","сучара",
+  "мудак","мудила","мудозвон","муде",
+  "пидор","пидарас","пидрила","пидр",
+  "залупа","дрочить","дрочун","дрочер",
+  "гондон","гандон",
+  "шлюха","шлюхи","шалава","шалавы","курва","курвы",
+  "ублюдок","ублюдки",
+  "долбоёб","долбоеб",
+  "хуесос","залупоед",
+  "мразь","мрази",
+  "падла","падлюка",
+  "чмо","чмошник","чмошники",
+  "охуеть","охуел","охуела","охуели",
+  "выблядок","выблядки",
+  "пиздюк","пиздюки",
+  "ёбаная","ёбаный",
+  "иди нахуй","пошёл нахуй","иди в пизду",
+  // English
+  "fuck","fucker","fucking","fucked","fucks","motherfucker","motherfucking",
+  "shit","shits","shitty","bullshit","horseshit",
+  "asshole","assholes","ass","asses",
+  "bitch","bitches","bitching",
+  "cunt","cunts",
+  "dick","dicks","dickhead","dickheads",
+  "cock","cocks","cocksucker",
+  "pussy","pussies",
+  "whore","whores",
+  "nigger","niggers","nigga","niggas",
+  "faggot","faggots","fag","fags",
+  "bastard","bastards",
+  "slut","slutty","sluts",
+  "retard","retarded","retards",
+  "damn","goddamn","damnit",
+  "prick","pricks",
+  "twat","twats",
+  "wanker","wankers",
+];
+
+router.post("/admin/banwords/import-from-web", requireAdmin, async (req, res) => {
+  try {
+    let fetchedWords: string[] = [];
+    // Try to fetch from LDNOOBW public GitHub list (RU + EN)
+    try {
+      const [ruRes, enRes] = await Promise.allSettled([
+        fetch("https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/ru", {
+          signal: AbortSignal.timeout(6000),
+        }),
+        fetch("https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en", {
+          signal: AbortSignal.timeout(6000),
+        }),
+      ]);
+      if (ruRes.status === "fulfilled" && ruRes.value.ok) {
+        const text = await ruRes.value.text();
+        fetchedWords.push(...text.split("\n").map(w => w.trim().toLowerCase()).filter(w => w.length >= 2 && !w.startsWith("#")));
+      }
+      if (enRes.status === "fulfilled" && enRes.value.ok) {
+        const text = await enRes.value.text();
+        fetchedWords.push(...text.split("\n").map(w => w.trim().toLowerCase()).filter(w => w.length >= 2 && !w.startsWith("#")));
+      }
+    } catch {}
+
+    const allWords = [...new Set([...PRESET_BANWORDS, ...fetchedWords])]
+      .map(w => w.trim().toLowerCase())
+      .filter(w => w.length >= 2);
+
+    let added = 0;
+    // Batch insert, ignore duplicates via ON CONFLICT
+    for (const word of allWords) {
+      try {
+        const result = await db.execute(
+          sql`INSERT INTO banwords (word, created_by) VALUES (${word}, ${req.currentUserId}) ON CONFLICT (word) DO NOTHING`
+        );
+        if ((result as any).rowCount > 0) added++;
+      } catch {}
+    }
+
+    invalidateBanwordsCache();
+    res.json({ added, total: allWords.length, fromInternet: fetchedWords.length });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка при импорте" });
+  }
+});
+
+router.post("/admin/banwords/scan-messages", requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.body?.limit ?? 300), 1000);
+    const rows = await db.execute(sql`
+      SELECT m.id, m.text, m.chat_id, m.sender_id, m.created_at,
+        u.display_name, u.username, u.avatar_color, u.avatar_url
+      FROM messages m
+      JOIN users u ON u.id = m.sender_id
+      WHERE m.text IS NOT NULL AND m.text != '' AND (m.is_deleted = false OR m.is_deleted IS NULL)
+      ORDER BY m.created_at DESC
+      LIMIT ${limit}
+    `);
+
+    const banwords = await getBanwords();
+    const flagged: any[] = [];
+
+    for (const row of (rows.rows as any[])) {
+      const text = String(row.text || "");
+      if (text.length < 2) continue;
+      const hit = findBanword(text, banwords);
+      const localResult = hit ? null : (text.length >= 5 ? localModerationCheck(text) : null);
+      if (hit || localResult?.flagged) {
+        flagged.push({
+          id: row.id,
+          text: text.slice(0, 300),
+          chatId: row.chat_id,
+          senderId: row.sender_id,
+          senderName: row.display_name || row.username,
+          senderUsername: row.username,
+          avatarColor: row.avatar_color,
+          avatarUrl: row.avatar_url,
+          createdAt: row.created_at,
+          reason: hit ? `Бан-слово: «${hit}»` : (localResult?.reason ?? "Нарушение правил"),
+          categories: hit ? ["custom_banned"] : (localResult?.categories ?? []),
+        });
+      }
+    }
+
+    res.json({ scanned: (rows.rows as any[]).length, flagged });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Ошибка при сканировании" });
+  }
+});
+
+router.delete("/admin/banwords/scan-delete/:id", requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    await db.execute(sql`UPDATE messages SET is_deleted = true WHERE id = ${id}`);
     res.status(204).send();
   } catch (err) {
     req.log.error(err);
