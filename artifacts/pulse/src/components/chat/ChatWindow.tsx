@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from "react";
-import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useInitiateCall, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
+import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
 import { useP2PChannel } from "@/hooks/useP2PChannel";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useLastSeen } from "@/hooks/useLastSeen";
@@ -295,7 +295,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const { toast } = useToast();
   const { data: chat, isLoading: isChatLoading } = useGetChatById(chatId, { query: { enabled: !!chatId } as any });
   const { data: messages, isLoading: isMessagesLoading } = useGetMessages({ chatId }, { query: { enabled: !!chatId } as any });
-  const initiateCall = useInitiateCall();
+  const [calling, setCalling] = useState(false);
   const markAsRead = useMarkChatAsRead();
   const updateChat = useUpdateChat();
 
@@ -546,7 +546,8 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   }, []);
 
   const handleStartCall = async (type: "audio" | "video") => {
-    if (!chat?.otherUser?.id) return;
+    if (!chat?.otherUser?.id || calling) return;
+    setCalling(true);
     try {
       await startCall(chat.otherUser.id, chatId, type);
     } catch (err: any) {
@@ -558,8 +559,10 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
       } else if (msg === "MEDIA_NOT_SUPPORTED") {
         toast({ title: "Не поддерживается", description: "Ваш браузер не поддерживает звонки. Попробуйте Chrome или Firefox.", variant: "destructive" });
       } else {
-        toast({ title: "Не удалось начать звонок", description: "Проверьте доступ к микрофону/камере", variant: "destructive" });
+        toast({ title: "Не удалось начать звонок", description: "Проверьте соединение с сервером", variant: "destructive" });
       }
+    } finally {
+      setCalling(false);
     }
   };
 
@@ -819,16 +822,16 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
               )}
               <button
                 onClick={() => handleStartCall("audio")}
-                disabled={initiateCall.isPending}
-                className="w-10 h-10 flex items-center justify-center hover:bg-secondary rounded-xl transition-all hover:text-foreground"
+                disabled={calling}
+                className="w-10 h-10 flex items-center justify-center hover:bg-secondary rounded-xl transition-all hover:text-foreground disabled:opacity-50"
                 title="Audio call"
               >
                 <Phone size={20} />
               </button>
               <button
                 onClick={() => handleStartCall("video")}
-                disabled={initiateCall.isPending}
-                className="w-10 h-10 flex items-center justify-center hover:bg-secondary rounded-xl transition-all hover:text-foreground"
+                disabled={calling}
+                className="w-10 h-10 flex items-center justify-center hover:bg-secondary rounded-xl transition-all hover:text-foreground disabled:opacity-50"
                 title="Video call"
               >
                 <Video size={22} />

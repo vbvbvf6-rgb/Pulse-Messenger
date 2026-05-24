@@ -340,42 +340,68 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
 
   // ── startCall ─────────────────────────────────────────────────────────────
   const startCall = useCallback(async (calleeId: number, chatId: number | null, type: "audio" | "video") => {
+    // 1. Get media — always falls back to silent stream, never throws
+    let stream: MediaStream;
     try {
-      let stream: MediaStream;
-      try {
-        if (navigator.mediaDevices?.getUserMedia) {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
-        } else {
-          stream = createSilentStream();
-        }
-      } catch (mediaErr: any) {
-        if (type === "video" && (mediaErr.name === "NotFoundError" || mediaErr.name === "DevicesNotFoundError")) {
-          try { stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
-          catch { stream = createSilentStream(); }
-        } else {
-          stream = createSilentStream();
-        }
+      if (navigator.mediaDevices?.getUserMedia) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === "video" });
+      } else {
+        stream = createSilentStream();
       }
-      localStreamRef.current = stream;
-      setLocalStream(stream);
+    } catch (mediaErr: any) {
+      if (type === "video" && (mediaErr.name === "NotFoundError" || mediaErr.name === "DevicesNotFoundError")) {
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
+        catch { stream = createSilentStream(); }
+      } else {
+        stream = createSilentStream();
+      }
+    }
+    localStreamRef.current = stream;
+    setLocalStream(stream);
 
+    // 2. Create the call record via API — this is the fatal step
+    let call: Call;
+    try {
       const res = await fetch("/api/calls", {
         method: "POST",
         headers: getUserHeaders(),
         body: JSON.stringify({ calleeId, ...(chatId != null ? { chatId } : {}), type }),
       });
       if (!res.ok) throw new Error("Failed to create call");
-      const call: Call = await res.json();
+      call = await res.json();
+    } catch (err) {
+      console.error("startCall: API error", err);
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+      setLocalStream(null);
+      throw err;
+    }
 
-      activeCallRef.current = call;
-      setActiveCall(call);
-      groupRoomIdRef.current = call.id;
+    // 3. Show call UI immediately — from here, WebRTC errors must NOT abort the call
+    activeCallRef.current = call;
+    setActiveCall(call);
+    groupRoomIdRef.current = call.id;
 
+    // 4. Ring timeout — mark as missed if callee doesn't answer in 60 s
+    ringTimeoutRef.current = setTimeout(async () => {
+      if (activeCallRef.current?.id === call.id && activeCallRef.current?.status === "ringing") {
+        try {
+          await fetch(`/api/calls/${call.id}`, {
+            method: "PUT",
+            headers: getUserHeaders(),
+            body: JSON.stringify({ status: "missed" }),
+          });
+        } catch {}
+        cleanupCall();
+      }
+    }, 60_000);
+
+    // 5. Socket.IO + WebRTC — non-fatal; call UI stays even if this fails
+    try {
       const sock = getSocket();
       setupCallSocket(sock, call.id);
       sock.emit("join-call", { callId: call.id });
 
-      // Create peer for callee
       const pc = createPeer(calleeId, call.id);
       peersRef.current.set(calleeId, pc);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
@@ -387,23 +413,8 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
         targetUserId: calleeId,
         signal: { type: "offer", sdp: offer.sdp },
       });
-
-      ringTimeoutRef.current = setTimeout(async () => {
-        if (activeCallRef.current?.id === call.id && activeCallRef.current?.status === "ringing") {
-          try {
-            await fetch(`/api/calls/${call.id}`, {
-              method: "PUT",
-              headers: getUserHeaders(),
-              body: JSON.stringify({ status: "missed" }),
-            });
-          } catch {}
-          cleanupCall();
-        }
-      }, 60_000);
-    } catch (err) {
-      console.error("startCall error:", err);
-      cleanupCall();
-      throw err;
+    } catch (rtcErr) {
+      console.warn("startCall: WebRTC setup failed (call UI still active):", rtcErr);
     }
   }, [getUserHeaders, createPeer, cleanupCall, getSocket, setupCallSocket]);
 
@@ -412,36 +423,44 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
     const call = activeCallRef.current;
     if (!call) return;
     if (ringTimeoutRef.current) { clearTimeout(ringTimeoutRef.current); ringTimeoutRef.current = null; }
+
+    // 1. Get media — never throws
+    let stream: MediaStream;
     try {
-      let stream: MediaStream;
-      try {
-        stream = navigator.mediaDevices?.getUserMedia
-          ? await navigator.mediaDevices.getUserMedia({ audio: true, video: call.type === "video" })
-          : createSilentStream();
-      } catch { stream = createSilentStream(); }
+      stream = navigator.mediaDevices?.getUserMedia
+        ? await navigator.mediaDevices.getUserMedia({ audio: true, video: call.type === "video" })
+        : createSilentStream();
+    } catch { stream = createSilentStream(); }
+    localStreamRef.current = stream;
+    setLocalStream(stream);
 
-      localStreamRef.current = stream;
-      setLocalStream(stream);
-
-      // groupRoomId was stored when incoming-call arrived
-      const roomId = groupRoomIdRef.current ?? call.id;
-      groupRoomIdRef.current = roomId;
-
-      const sock = getSocket();
-      setupCallSocket(sock, roomId);
-      sock.emit("join-call", { callId: roomId });
-
+    // 2. Update call status via API — fatal if this fails
+    try {
       await fetch(`/api/calls/${call.id}`, {
         method: "PUT",
         headers: getUserHeaders(),
         body: JSON.stringify({ status: "active" }),
       });
-      const updatedCall = { ...call, status: "active" as const };
-      activeCallRef.current = updatedCall;
-      setActiveCall(updatedCall);
     } catch (err) {
-      console.error("acceptCall error:", err);
+      console.error("acceptCall: API error", err);
       cleanupCall();
+      return;
+    }
+
+    // 3. Show active call UI
+    const updatedCall = { ...call, status: "active" as const };
+    activeCallRef.current = updatedCall;
+    setActiveCall(updatedCall);
+
+    // 4. Socket.IO + WebRTC — non-fatal
+    const roomId = groupRoomIdRef.current ?? call.id;
+    groupRoomIdRef.current = roomId;
+    try {
+      const sock = getSocket();
+      setupCallSocket(sock, roomId);
+      sock.emit("join-call", { callId: roomId });
+    } catch (rtcErr) {
+      console.warn("acceptCall: WebRTC/socket setup failed (call still active):", rtcErr);
     }
   }, [getSocket, setupCallSocket, getUserHeaders, cleanupCall]);
 
