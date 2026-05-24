@@ -381,7 +381,21 @@ export default function Admin() {
   const [eventStartAt, setEventStartAt] = useState("");
   const [eventEndAt, setEventEndAt] = useState("");
   const [eventActive, setEventActive] = useState(true);
+  const [eventEmoji, setEventEmoji] = useState("🎉");
   const [eventSaving, setEventSaving] = useState(false);
+
+  const EVENT_TYPES = [
+    { emoji: "🎉", label: "Праздник", color: "#f59e0b" },
+    { emoji: "🏆", label: "Турнир", color: "#eab308" },
+    { emoji: "🎁", label: "Раздача", color: "#8b5cf6" },
+    { emoji: "⚡", label: "Буст", color: "#f97316" },
+    { emoji: "🎮", label: "Игра", color: "#3b82f6" },
+    { emoji: "🔥", label: "Хот", color: "#ef4444" },
+    { emoji: "💎", label: "Prime", color: "#a855f7" },
+    { emoji: "🌟", label: "Особое", color: "#06b6d4" },
+    { emoji: "🎵", label: "Музыка", color: "#ec4899" },
+    { emoji: "🚀", label: "Запуск", color: "#10b981" },
+  ];
 
   const fetchPlatformEvents = async () => {
     setEventsLoading(true);
@@ -413,17 +427,22 @@ export default function Admin() {
   const openEventForm = (ev?: PlatformEvent) => {
     if (ev) {
       setEditingEvent(ev);
-      setEventTitle(ev.title);
+      const emojiMatch = ev.title.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u);
+      const parsedEmoji = emojiMatch ? emojiMatch[0].trim() : "🎉";
+      const cleanTitle = emojiMatch ? ev.title.slice(emojiMatch[0].length) : ev.title;
+      setEventEmoji(parsedEmoji);
+      setEventTitle(cleanTitle);
       setEventDesc(ev.description || "");
       setEventImage(ev.imageUrl || "");
-      setEventColor(ev.bannerColor || "#7c3aed");
+      const matchedType = EVENT_TYPES.find(t => t.emoji === parsedEmoji);
+      setEventColor(matchedType?.color || ev.bannerColor || "#7c3aed");
       setEventStartAt(ev.startAt ? ev.startAt.slice(0, 16) : "");
       setEventEndAt(ev.endAt ? ev.endAt.slice(0, 16) : "");
       setEventActive(ev.isActive);
     } else {
       setEditingEvent(null);
-      setEventTitle(""); setEventDesc(""); setEventImage("");
-      setEventColor("#7c3aed"); setEventStartAt(""); setEventEndAt(""); setEventActive(true);
+      setEventEmoji("🎉"); setEventTitle(""); setEventDesc(""); setEventImage("");
+      setEventColor("#f59e0b"); setEventStartAt(""); setEventEndAt(""); setEventActive(true);
     }
     setShowEventForm(true);
   };
@@ -431,9 +450,10 @@ export default function Admin() {
   const handleSaveEvent = async () => {
     if (!eventTitle.trim()) return showToast("Введите заголовок", "err");
     setEventSaving(true);
+    const fullTitle = `${eventEmoji} ${eventTitle.trim()}`;
     try {
       const payload = {
-        title: eventTitle.trim(), description: eventDesc.trim() || null,
+        title: fullTitle, description: eventDesc.trim() || null,
         imageUrl: eventImage.trim() || null, bannerColor: eventColor,
         startAt: eventStartAt || null, endAt: eventEndAt || null, isActive: eventActive,
       };
@@ -1957,6 +1977,42 @@ export default function Admin() {
               {showEventForm && (
                 <div className="p-4 border-b border-border bg-secondary/20 space-y-3">
                   <p className="text-sm font-bold text-foreground">{editingEvent ? "Редактировать событие" : "Новое событие"}</p>
+
+                  {/* Event type / emoji picker */}
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">Тип события</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {EVENT_TYPES.map(t => (
+                        <button
+                          key={t.emoji}
+                          type="button"
+                          onClick={() => { setEventEmoji(t.emoji); setEventColor(t.color); }}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                            eventEmoji === t.emoji
+                              ? "text-white border-transparent scale-105"
+                              : "border-border text-muted-foreground hover:border-border/80 hover:text-foreground"
+                          }`}
+                          style={eventEmoji === t.emoji ? { background: t.color, boxShadow: `0 0 8px ${t.color}60` } : {}}
+                        >
+                          <span>{t.emoji}</span>
+                          <span>{t.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Live preview */}
+                  <div className="rounded-xl p-3 border" style={{ background: `${eventColor}12`, borderColor: `${eventColor}40` }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{eventEmoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-black text-foreground truncate">{eventTitle || "Заголовок события"}</p>
+                        {eventDesc && <p className="text-xs text-muted-foreground truncate mt-0.5">{eventDesc}</p>}
+                      </div>
+                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: `${eventColor}25`, color: eventColor }}>🔴 LIVE</span>
+                    </div>
+                  </div>
+
                   <input
                     value={eventTitle}
                     onChange={e => setEventTitle(e.target.value)}
@@ -1990,7 +2046,7 @@ export default function Admin() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                      <label className="text-xs text-muted-foreground">Цвет баннера:</label>
+                      <label className="text-xs text-muted-foreground">Цвет:</label>
                       <input type="color" value={eventColor} onChange={e => setEventColor(e.target.value)}
                         className="w-8 h-8 rounded-lg border border-border cursor-pointer bg-transparent" />
                       <span className="text-xs font-mono text-muted-foreground">{eventColor}</span>
@@ -2009,8 +2065,9 @@ export default function Admin() {
                       Отмена
                     </button>
                     <button onClick={handleSaveEvent} disabled={eventSaving}
-                      className="flex-1 py-2 rounded-xl bg-violet-500 text-white text-xs font-bold hover:bg-violet-600 transition-colors disabled:opacity-50">
-                      {eventSaving ? "Сохраняем..." : editingEvent ? "Сохранить" : "Создать"}
+                      className="flex-1 py-2 rounded-xl text-white text-xs font-bold transition-colors disabled:opacity-50"
+                      style={{ background: eventColor }}>
+                      {eventSaving ? "Сохраняем..." : editingEvent ? "Сохранить" : `${eventEmoji} Создать`}
                     </button>
                   </div>
                 </div>

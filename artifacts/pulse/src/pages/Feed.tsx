@@ -632,6 +632,260 @@ const TOPICS = [
 
 type TopicId = typeof TOPICS[number]["id"];
 
+// ─── Event Countdown ──────────────────────────────────────────────────────────
+function useCountdown(endAt: string | null) {
+  const [remaining, setRemaining] = React.useState(() =>
+    endAt ? Math.max(0, new Date(endAt).getTime() - Date.now()) : null
+  );
+  React.useEffect(() => {
+    if (!endAt) return;
+    const id = setInterval(() => setRemaining(Math.max(0, new Date(endAt).getTime() - Date.now())), 1000);
+    return () => clearInterval(id);
+  }, [endAt]);
+  if (remaining === null) return null;
+  const d = Math.floor(remaining / 86400000);
+  const h = Math.floor((remaining % 86400000) / 3600000);
+  const m = Math.floor((remaining % 3600000) / 60000);
+  const s = Math.floor((remaining % 60000) / 1000);
+  return { d, h, m, s, totalMs: remaining };
+}
+
+// ─── Floating Particle ────────────────────────────────────────────────────────
+function Particle({ color, delay, x, size }: { color: string; delay: number; x: number; size: number }) {
+  return (
+    <motion.div
+      className="absolute bottom-0 rounded-full pointer-events-none"
+      style={{ left: `${x}%`, width: size, height: size, backgroundColor: color, opacity: 0.6 }}
+      animate={{ y: [-0, -80], opacity: [0, 0.8, 0], scale: [0.5, 1.2, 0.3] }}
+      transition={{ duration: 2.5 + Math.random() * 2, delay, repeat: Infinity, repeatDelay: 1 + Math.random() * 3, ease: "easeOut" }}
+    />
+  );
+}
+
+// ─── Single Event Card ────────────────────────────────────────────────────────
+function EventCard({ ev, onDismiss }: { ev: any; onDismiss: () => void }) {
+  const color = ev.bannerColor || "#7c3aed";
+  const countdown = useCountdown(ev.endAt);
+  const [joined, setJoined] = React.useState(false);
+  const [burst, setBurst] = React.useState(false);
+
+  const progress = React.useMemo(() => {
+    if (!ev.startAt || !ev.endAt) return null;
+    const total = new Date(ev.endAt).getTime() - new Date(ev.startAt).getTime();
+    const elapsed = Date.now() - new Date(ev.startAt).getTime();
+    return Math.min(100, Math.max(0, (elapsed / total) * 100));
+  }, [ev.startAt, ev.endAt]);
+
+  // Detect emoji prefix in title
+  const emojiMatch = ev.title.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u);
+  const emoji = emojiMatch ? emojiMatch[0].trim() : "🎉";
+  const cleanTitle = emojiMatch ? ev.title.slice(emojiMatch[0].length) : ev.title;
+
+  const particles = React.useMemo(() => Array.from({ length: 8 }, (_, i) => ({
+    x: 5 + i * 13,
+    delay: i * 0.35,
+    size: 4 + Math.floor(i % 3) * 3,
+  })), []);
+
+  const handleJoin = () => {
+    setJoined(v => !v);
+    if (!joined) {
+      setBurst(true);
+      setTimeout(() => setBurst(false), 600);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -12, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.96 }}
+      transition={{ type: "spring", stiffness: 300, damping: 24 }}
+      className="relative rounded-2xl overflow-hidden"
+      style={{
+        background: `linear-gradient(135deg, ${color}18 0%, ${color}08 60%, transparent 100%)`,
+        border: `1.5px solid ${color}50`,
+        boxShadow: `0 0 24px ${color}18, inset 0 1px 0 ${color}20`,
+      }}
+    >
+      {/* Floating particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {particles.map((p, i) => (
+          <Particle key={i} color={color} delay={p.delay} x={p.x} size={p.size} />
+        ))}
+      </div>
+
+      {/* Glow pulse */}
+      <motion.div
+        className="absolute inset-0 rounded-2xl pointer-events-none"
+        animate={{ opacity: [0, 0.12, 0] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        style={{ background: `radial-gradient(ellipse at 50% 0%, ${color}60 0%, transparent 70%)` }}
+      />
+
+      <div className="relative z-10 p-4">
+        {/* Header row */}
+        <div className="flex items-start gap-3">
+          {/* Big emoji / image */}
+          <div className="shrink-0 relative">
+            {ev.imageUrl ? (
+              <motion.img
+                src={ev.imageUrl}
+                alt=""
+                className="w-14 h-14 rounded-xl object-cover"
+                animate={{ scale: [1, 1.04, 1] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              />
+            ) : (
+              <motion.div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+                style={{ background: `${color}20`, border: `1.5px solid ${color}30` }}
+                animate={{ rotate: [0, -6, 6, -4, 0], scale: [1, 1.08, 1] }}
+                transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}
+              >
+                {emoji}
+              </motion.div>
+            )}
+            {/* Live dot */}
+            <motion.div
+              className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-background"
+              style={{ backgroundColor: color }}
+              animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            />
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <motion.span
+                className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest"
+                style={{ background: `${color}25`, color, border: `1px solid ${color}40` }}
+                animate={{ opacity: [1, 0.7, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                🔴 LIVE EVENT
+              </motion.span>
+              <button
+                onClick={onDismiss}
+                className="ml-auto p-0.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+              >
+                <X size={13} />
+              </button>
+            </div>
+
+            <p className="font-black text-base text-foreground leading-tight">{cleanTitle}</p>
+
+            {ev.description && (
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">{ev.description}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Countdown timer */}
+        {countdown && countdown.totalMs > 0 && (
+          <div className="mt-3 flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground font-medium shrink-0">Осталось:</span>
+            <div className="flex items-center gap-1">
+              {countdown.d > 0 && (
+                <div className="flex flex-col items-center px-2 py-1 rounded-lg" style={{ background: `${color}18` }}>
+                  <span className="text-sm font-black tabular-nums" style={{ color }}>{countdown.d}</span>
+                  <span className="text-[8px] text-muted-foreground uppercase">дн</span>
+                </div>
+              )}
+              <div className="flex flex-col items-center px-2 py-1 rounded-lg" style={{ background: `${color}18` }}>
+                <span className="text-sm font-black tabular-nums" style={{ color }}>{String(countdown.h).padStart(2, "0")}</span>
+                <span className="text-[8px] text-muted-foreground uppercase">ч</span>
+              </div>
+              <span className="text-sm font-black" style={{ color }}>:</span>
+              <div className="flex flex-col items-center px-2 py-1 rounded-lg" style={{ background: `${color}18` }}>
+                <span className="text-sm font-black tabular-nums" style={{ color }}>{String(countdown.m).padStart(2, "0")}</span>
+                <span className="text-[8px] text-muted-foreground uppercase">мин</span>
+              </div>
+              <span className="text-sm font-black" style={{ color }}>:</span>
+              <div className="flex flex-col items-center px-2 py-1 rounded-lg" style={{ background: `${color}18` }}>
+                <motion.span
+                  key={countdown.s}
+                  className="text-sm font-black tabular-nums"
+                  style={{ color }}
+                  initial={{ opacity: 0.4, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {String(countdown.s).padStart(2, "0")}
+                </motion.span>
+                <span className="text-[8px] text-muted-foreground uppercase">сек</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Progress bar */}
+        {progress !== null && (
+          <div className="mt-2.5">
+            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                style={{ background: `linear-gradient(90deg, ${color}80, ${color})` }}
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+              />
+            </div>
+            <p className="text-[9px] text-muted-foreground mt-0.5 text-right">{Math.round(progress)}% прошло</p>
+          </div>
+        )}
+
+        {/* Footer: date + join button */}
+        <div className="mt-3 flex items-center justify-between gap-3">
+          {ev.endAt && !countdown && (
+            <p className="text-[10px] text-muted-foreground">
+              До {new Date(ev.endAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+            </p>
+          )}
+          {!ev.endAt && !countdown && <div />}
+
+          <motion.button
+            onClick={handleJoin}
+            whileTap={{ scale: 0.92 }}
+            className="relative ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black text-white transition-all overflow-hidden"
+            style={{
+              background: joined
+                ? `linear-gradient(135deg, #10b981, #059669)`
+                : `linear-gradient(135deg, ${color}, ${color}cc)`,
+              boxShadow: joined ? "0 0 12px #10b98150" : `0 0 12px ${color}50`,
+            }}
+          >
+            <AnimatePresence mode="wait">
+              {burst && (
+                <motion.span
+                  key="burst"
+                  className="absolute inset-0 flex items-center justify-center text-base"
+                  initial={{ opacity: 1, scale: 0.5 }}
+                  animate={{ opacity: 0, scale: 2 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  🎊
+                </motion.span>
+              )}
+            </AnimatePresence>
+            <motion.span
+              key={joined ? "joined" : "join"}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+            >
+              {joined ? "✓ Участвую!" : "Участвовать"}
+            </motion.span>
+          </motion.button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 function ActiveEvents() {
   const [events, setEvents] = React.useState<any[]>([]);
   const [dismissed, setDismissed] = React.useState<Set<number>>(new Set());
@@ -649,40 +903,17 @@ function ActiveEvents() {
   if (visible.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      {visible.map(ev => (
-        <motion.div
-          key={ev.id}
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          className="rounded-2xl overflow-hidden border border-white/10"
-          style={{ background: `linear-gradient(135deg, ${ev.bannerColor || "#7c3aed"}22, ${ev.bannerColor || "#7c3aed"}11)`, borderColor: `${ev.bannerColor || "#7c3aed"}40` }}
-        >
-          <div className="p-4 flex items-start gap-3">
-            {ev.imageUrl && (
-              <img src={ev.imageUrl} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-base">🎉</span>
-                <p className="font-bold text-sm text-foreground truncate">{ev.title}</p>
-                <div className="ml-auto shrink-0 flex items-center gap-1">
-                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: `${ev.bannerColor || "#7c3aed"}30`, color: ev.bannerColor || "#7c3aed" }}>EVENT</span>
-                  <button onClick={() => setDismissed(prev => new Set([...prev, ev.id]))} className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"><X size={13} /></button>
-                </div>
-              </div>
-              {ev.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ev.description}</p>}
-              {(ev.startAt || ev.endAt) && (
-                <p className="text-[10px] text-muted-foreground mt-1.5">
-                  {ev.endAt ? `До ${new Date(ev.endAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}` : ""}
-                </p>
-              )}
-            </div>
-          </div>
-        </motion.div>
-      ))}
-    </div>
+    <AnimatePresence>
+      <div className="space-y-3">
+        {visible.map(ev => (
+          <EventCard
+            key={ev.id}
+            ev={ev}
+            onDismiss={() => setDismissed(prev => new Set([...prev, ev.id]))}
+          />
+        ))}
+      </div>
+    </AnimatePresence>
   );
 }
 
