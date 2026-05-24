@@ -158,10 +158,6 @@ export default function Admin() {
   const [massLoading, setMassLoading] = useState(false);
   const [showMassConfirm, setShowMassConfirm] = useState(false);
 
-  // Announcement
-  const [announcementText, setAnnouncementText] = useState("");
-  const [announcementLoading, setAnnouncementLoading] = useState(false);
-  const [showAnnounce, setShowAnnounce] = useState(false);
 
   // Prime
   const [primeMonths, setPrimeMonths] = useState("1");
@@ -935,23 +931,6 @@ export default function Admin() {
     setMassLoading(false);
   };
 
-  const handleAnnouncement = async () => {
-    if (!announcementText.trim()) return;
-    setAnnouncementLoading(true);
-    try {
-      const res = await fetch("/api/admin/announcement", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getHeader() },
-        body: JSON.stringify({ text: announcementText.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { showToast(data.error || "Ошибка", "err"); return; }
-      showToast(`📢 Отправлено в ${data.chatsSent} чат(ов)`, "ok");
-      setAnnouncementText("");
-      setShowAnnounce(false);
-    } catch { showToast("Ошибка соединения", "err"); }
-    setAnnouncementLoading(false);
-  };
 
   const handleEditProfile = async () => {
     if (!selectedUser || !editDisplayName.trim()) return;
@@ -1135,46 +1114,8 @@ export default function Admin() {
           </div>
         )}
 
-        {/* Tools row: Announcement + Mass SPARK + Posts + Leaderboard */}
+        {/* Tools row: Mass SPARK + Posts + Leaderboard */}
         <div className="grid md:grid-cols-2 gap-4">
-          {/* Broadcast announcement */}
-          <div className="bg-card border border-border rounded-2xl overflow-hidden">
-            <button
-              onClick={() => setShowAnnounce(v => !v)}
-              className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                  <Megaphone size={18} className="text-orange-400" />
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold text-sm">Объявление всем</p>
-                  <p className="text-xs text-muted-foreground">Отправить сообщение от бота</p>
-                </div>
-              </div>
-              {showAnnounce ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
-            </button>
-            {showAnnounce && (
-              <div className="px-4 pb-4 space-y-3 border-t border-border">
-                <textarea
-                  value={announcementText}
-                  onChange={e => setAnnouncementText(e.target.value)}
-                  placeholder="Текст объявления от DeepSeek AI..."
-                  rows={3}
-                  className="w-full mt-3 bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors resize-none"
-                />
-                <button
-                  onClick={handleAnnouncement}
-                  disabled={announcementLoading || !announcementText.trim()}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 transition-colors disabled:opacity-50"
-                >
-                  <Send size={14} />
-                  {announcementLoading ? "Отправляем..." : "Отправить объявление"}
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Mass SPARK */}
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
             <div className="p-4">
