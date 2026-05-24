@@ -334,5 +334,112 @@ export function Sidebar({ mobileSidebarOpen, onMobileClose, onMobileOpen, onOpen
     </div>
   );
 
-  return <>{DesktopSidebar}</>;
+  const MobileSidebar = (
+    <>
+      <div
+        className={`fixed inset-0 z-[90] md:hidden bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${mobileSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        onClick={onMobileClose}
+      />
+      <div
+        className={`fixed left-0 top-0 bottom-0 z-[91] md:hidden w-[280px] bg-card border-r border-border flex flex-col py-4 shadow-2xl transition-transform duration-300 overflow-y-auto`}
+        style={{ transform: mobileSidebarOpen ? "translateX(0)" : "translateX(-100%)" }}
+      >
+        <div className="flex items-center gap-2 px-4 mb-5">
+          <div className="w-9 h-9 rounded-[12px] bg-gradient-to-br from-primary to-violet-700 flex items-center justify-center shadow-[0_0_20px_rgba(139,92,246,0.35)] shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M13 2L4.5 13.5H11L10 22L19.5 10.5H13L13 2Z" fill="white" />
+            </svg>
+          </div>
+          <span className="font-black text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-foreground to-muted-foreground flex-1">Pulse</span>
+          <button onClick={onMobileClose} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all">
+            <X size={18} />
+          </button>
+        </div>
+
+        <nav className="flex-1 flex flex-col gap-1 px-3 overflow-y-auto scrollbar-none">
+          {NAV_ITEMS.map((item) => {
+            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+            const showBadge = item.href === "/" && totalUnread > 0;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onMobileClose}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative",
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-[0_4px_14px_rgba(139,92,246,0.3)]"
+                    : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+                )}
+              >
+                <div className="relative shrink-0">
+                  <item.icon size={18} className={cn("transition-transform duration-300 group-hover:scale-110", isActive && "text-white")} />
+                  {showBadge && (
+                    <div className={cn("absolute -top-2 -right-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center shadow-sm", isActive ? "bg-white text-primary" : "bg-primary text-white")}>
+                      {totalUnread > 99 ? "99+" : totalUnread}
+                    </div>
+                  )}
+                </div>
+                <span className="font-semibold text-sm truncate flex-1">{item.label}</span>
+              </Link>
+            );
+          })}
+
+          <Link
+            href="/prime"
+            onClick={onMobileClose}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group border mt-2",
+              location.startsWith("/prime")
+                ? "bg-gradient-to-r from-violet-600 to-indigo-500 text-white border-transparent shadow-[0_4px_14px_rgba(139,92,246,0.4)]"
+                : "border-violet-500/20 text-violet-400 hover:bg-violet-500/10 hover:border-violet-500/30"
+            )}
+          >
+            <Crown size={18} className="transition-transform duration-300 group-hover:scale-110 shrink-0" />
+            <span className="font-semibold text-sm truncate">{t("nav.prime")}</span>
+          </Link>
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              onClick={onMobileClose}
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group border mt-2",
+                location.startsWith("/admin")
+                  ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-transparent shadow-[0_4px_14px_rgba(99,102,241,0.4)]"
+                  : "border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/10 hover:border-indigo-500/30"
+              )}
+            >
+              <Shield size={18} className="transition-transform duration-300 group-hover:scale-110 shrink-0" />
+              <span className="font-semibold text-sm truncate">{t("nav.admin")}</span>
+            </Link>
+          )}
+        </nav>
+
+        <div className="w-full px-3 pt-3 mt-auto border-t border-border">
+          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/30">
+            <div
+              className={cn("w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden shrink-0", isPremium && "ring-2 ring-violet-500 ring-offset-2 ring-offset-card")}
+              style={{ backgroundColor: me?.avatarColor || "#3B82F6" }}
+            >
+              {me?.avatarUrl ? <img src={me.avatarUrl} alt="" className="w-full h-full object-cover" /> : initial}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold truncate text-foreground leading-tight">{me?.displayName || "..."}</p>
+              <p className="text-xs text-muted-foreground truncate">@{me?.username || "..."}</p>
+            </div>
+            <button
+              onClick={() => { onMobileClose(); logout(); }}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all shrink-0"
+              title="Выйти"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  return <>{DesktopSidebar}{MobileSidebar}</>;
 }

@@ -179,7 +179,7 @@ function MainAppInner({ onLogout, onSwitchAccount, onRemoveAccount, onOpenAddAcc
               <Route path="/calls" component={Calls} />
               <Route path="/feed" component={Feed} />
               <Route path="/contacts" component={Contacts} />
-                    <Route path="/stories" component={Stories} />
+              <Route path="/stories" component={Stories} />
               <Route path="/wallet" component={Wallet} />
               <Route path="/admin" component={Admin} />
               <Route path="/prime" component={Prime} />

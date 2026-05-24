@@ -378,7 +378,11 @@ export default function Stories() {
               className="fixed inset-0 z-50 bg-black"
             >
               <div className="relative w-full h-full flex items-stretch justify-center">
-                <div className="relative w-full max-w-[430px] mx-auto h-full overflow-hidden">
+                <div
+                  className="hidden md:block flex-1 bg-black/80 cursor-pointer"
+                  onClick={() => setViewingGroup(null)}
+                />
+                <div className="relative w-full max-w-[430px] h-full overflow-hidden">
                   <div
                     className="absolute inset-0 w-full h-full"
                     style={{ backgroundColor: story?.backgroundColor || "#111" }}

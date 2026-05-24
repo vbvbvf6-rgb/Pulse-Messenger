@@ -9,6 +9,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { activeCall } = useAppContext();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -23,14 +24,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden bg-background text-foreground">
-      <Sidebar mobileSidebarOpen={false} onMobileClose={() => {}} onOpenPalette={() => setPaletteOpen(true)} />
+      <Sidebar
+        mobileSidebarOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
+        onOpenPalette={() => setPaletteOpen(true)}
+      />
       <main className="flex-1 flex overflow-hidden relative">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none" />
         {children}
         <ActiveCall />
         <IncomingCall />
       </main>
-      <BottomNav onOpenPalette={() => setPaletteOpen(true)} />
+      <BottomNav
+        onOpenPalette={() => setPaletteOpen(true)}
+        onOpenSidebar={() => setMobileSidebarOpen(true)}
+      />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );

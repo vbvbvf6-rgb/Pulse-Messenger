@@ -1,11 +1,16 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { MessageCircle, Phone, Users, Settings, History } from "lucide-react";
+import { MessageCircle, Phone, Users, Rss, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetChats } from "@workspace/api-client-react";
 import { useAppContext } from "@/contexts/AppContext";
 
-export function BottomNav({ onOpenPalette }: { onOpenPalette?: () => void }) {
+interface BottomNavProps {
+  onOpenPalette?: () => void;
+  onOpenSidebar?: () => void;
+}
+
+export function BottomNav({ onOpenPalette, onOpenSidebar }: BottomNavProps) {
   const [location] = useLocation();
   const { data: chats } = useGetChats();
   const { selectedChatId } = useAppContext();
@@ -13,11 +18,10 @@ export function BottomNav({ onOpenPalette }: { onOpenPalette?: () => void }) {
   const totalUnread = chats?.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0) ?? 0;
 
   const NAV_ITEMS = [
-    { href: "/",         icon: MessageCircle, label: "Чаты",     badge: totalUnread },
-    { href: "/calls",    icon: Phone,         label: "Звонки",   badge: 0 },
-    { href: "/contacts", icon: Users,         label: "Контакты", badge: 0 },
-    { href: "/stories",  icon: History,       label: "Истории",  badge: 0 },
-    { href: "/settings", icon: Settings,      label: "Настройки",badge: 0 },
+    { href: "/",         icon: MessageCircle, label: "Чаты",    badge: totalUnread },
+    { href: "/calls",    icon: Phone,         label: "Звонки",  badge: 0 },
+    { href: "/contacts", icon: Users,         label: "Контакты",badge: 0 },
+    { href: "/feed",     icon: Rss,           label: "Лента",   badge: 0 },
   ];
 
   if (selectedChatId) return null;
@@ -46,10 +50,7 @@ export function BottomNav({ onOpenPalette }: { onOpenPalette?: () => void }) {
                 <item.icon
                   size={24}
                   strokeWidth={isActive ? 2.5 : 1.8}
-                  className={cn(
-                    "transition-all duration-200",
-                    isActive && "scale-110"
-                  )}
+                  className={cn("transition-all duration-200", isActive && "scale-110")}
                   fill={isActive ? "currentColor" : "none"}
                 />
                 {item.badge > 0 && (
@@ -58,15 +59,20 @@ export function BottomNav({ onOpenPalette }: { onOpenPalette?: () => void }) {
                   </div>
                 )}
               </div>
-              <span className={cn(
-                "text-[10px] font-semibold leading-none transition-colors",
-                isActive ? "text-primary" : "text-muted-foreground/60"
-              )}>
+              <span className={cn("text-[10px] font-semibold leading-none transition-colors", isActive ? "text-primary" : "text-muted-foreground/60")}>
                 {item.label}
               </span>
             </Link>
           );
         })}
+
+        <button
+          onClick={onOpenSidebar}
+          className="relative flex flex-col items-center justify-center gap-[3px] flex-1 py-2 transition-all active:scale-95 text-muted-foreground"
+        >
+          <Menu size={24} strokeWidth={1.8} />
+          <span className="text-[10px] font-semibold leading-none text-muted-foreground/60">Ещё</span>
+        </button>
       </div>
     </nav>
   );

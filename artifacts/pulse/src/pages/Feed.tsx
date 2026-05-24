@@ -575,7 +575,7 @@ function PostCard({ post, onAppealSubmitted, onTopicClick }: { post: Post & { ap
               className={`transition-transform group-hover:scale-110 ${showComments ? "fill-primary/20" : ""}`}
             />
             <span className="font-semibold text-xs">{displayCommentCount}</span>
-            <span className="text-[11px] font-medium hidden sm:inline">Комментарии</span>
+            <span className="text-[11px] font-medium">Комментарии</span>
             {showComments
               ? <ChevronUp size={13} className="opacity-60" />
               : <ChevronDown size={13} className="opacity-60" />
