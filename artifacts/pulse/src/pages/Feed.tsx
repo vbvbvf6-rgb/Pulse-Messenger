@@ -651,13 +651,13 @@ function useCountdown(endAt: string | null) {
 }
 
 // ─── Floating Particle ────────────────────────────────────────────────────────
-function Particle({ color, delay, x, size }: { color: string; delay: number; x: number; size: number }) {
+function Particle({ color, delay, x, size, duration, repeatDelay }: { color: string; delay: number; x: number; size: number; duration: number; repeatDelay: number }) {
   return (
     <motion.div
       className="absolute bottom-0 rounded-full pointer-events-none"
       style={{ left: `${x}%`, width: size, height: size, backgroundColor: color, opacity: 0.6 }}
-      animate={{ y: [-0, -80], opacity: [0, 0.8, 0], scale: [0.5, 1.2, 0.3] }}
-      transition={{ duration: 2.5 + Math.random() * 2, delay, repeat: Infinity, repeatDelay: 1 + Math.random() * 3, ease: "easeOut" }}
+      animate={{ y: [0, -80], opacity: [0, 0.8, 0], scale: [0.5, 1.2, 0.3] }}
+      transition={{ duration, delay, repeat: Infinity, repeatDelay, ease: "easeOut" }}
     />
   );
 }
@@ -681,11 +681,16 @@ function EventCard({ ev, onDismiss }: { ev: any; onDismiss: () => void }) {
   const emoji = emojiMatch ? emojiMatch[0].trim() : "🎉";
   const cleanTitle = emojiMatch ? ev.title.slice(emojiMatch[0].length) : ev.title;
 
-  const particles = React.useMemo(() => Array.from({ length: 8 }, (_, i) => ({
-    x: 5 + i * 13,
-    delay: i * 0.35,
-    size: 4 + Math.floor(i % 3) * 3,
-  })), []);
+  const particles = React.useMemo(() => {
+    const rand = (seed: number, min: number, max: number) => min + ((seed * 9301 + 49297) % 233280) / 233280 * (max - min);
+    return Array.from({ length: 8 }, (_, i) => ({
+      x: 5 + i * 13,
+      delay: i * 0.35,
+      size: 4 + (i % 3) * 3,
+      duration: rand(i, 2.5, 4.5),
+      repeatDelay: rand(i + 10, 1, 4),
+    }));
+  }, []);
 
   const handleJoin = () => {
     setJoined(v => !v);
@@ -711,7 +716,7 @@ function EventCard({ ev, onDismiss }: { ev: any; onDismiss: () => void }) {
       {/* Floating particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {particles.map((p, i) => (
-          <Particle key={i} color={color} delay={p.delay} x={p.x} size={p.size} />
+          <Particle key={i} color={color} delay={p.delay} x={p.x} size={p.size} duration={p.duration} repeatDelay={p.repeatDelay} />
         ))}
       </div>
 
