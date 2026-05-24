@@ -220,4 +220,24 @@ router.get("/users/:userId/gift-showcase", async (req, res) => {
   }
 });
 
+// Report a user
+router.post("/users/:userId/report", async (req, res) => {
+  try {
+    const reporterId = (req as any).userId;
+    if (!reporterId) return res.status(401).json({ error: "Unauthorized" });
+    const targetId = Number(req.params.userId);
+    if (!targetId || targetId === reporterId) return res.status(400).json({ error: "Invalid userId" });
+    const { reason, details } = req.body as { reason: string; details?: string };
+    if (!reason) return res.status(400).json({ error: "Reason is required" });
+    await db.execute(sql`
+      INSERT INTO user_reports (reporter_id, target_id, reason, details, created_at)
+      VALUES (${reporterId}, ${targetId}, ${reason}, ${details ?? null}, NOW())
+    `);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

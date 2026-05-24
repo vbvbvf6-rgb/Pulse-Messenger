@@ -31,6 +31,8 @@ import {
   Zap,
   X,
   HandCoins,
+  Flag,
+  AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -45,6 +47,131 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 const getToken = () => sessionStorage.getItem("pulse-token");
+
+const REPORT_REASONS = [
+  "Спам",
+  "Оскорбления и ненависть",
+  "Мошенничество",
+  "Нежелательный контент",
+  "Выдаёт себя за другого",
+  "Другое",
+];
+
+function ReportUserDialog({ userId, displayName }: { userId: number; displayName: string }) {
+  const [open, setOpen] = React.useState(false);
+  const [reason, setReason] = React.useState("");
+  const [details, setDetails] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+  const { toast } = useToast();
+
+  async function submit() {
+    if (!reason) return;
+    setLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/users/${userId}/report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason, details }),
+      });
+      if (res.ok) {
+        setSent(true);
+      } else {
+        toast({ title: "Ошибка", description: "Не удалось отправить жалобу", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Ошибка", description: "Нет соединения", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function close() {
+    setOpen(false);
+    setTimeout(() => { setSent(false); setReason(""); setDetails(""); }, 300);
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="p-2 rounded-full hover:bg-secondary text-muted-foreground hover:text-red-400 transition-colors"
+        title="Пожаловаться"
+      >
+        <Flag size={18} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+            onClick={e => { if (e.target === e.currentTarget) close(); }}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={close} />
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="relative bg-card border border-border rounded-3xl p-6 w-full max-w-sm shadow-2xl z-10"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 rounded-full bg-red-500/15 text-red-500"><AlertTriangle size={18} /></div>
+                <div>
+                  <p className="font-bold text-sm">Пожаловаться</p>
+                  <p className="text-xs text-muted-foreground">на {displayName}</p>
+                </div>
+                <button onClick={close} className="ml-auto p-1.5 rounded-full hover:bg-secondary text-muted-foreground transition-colors"><X size={16} /></button>
+              </div>
+
+              {sent ? (
+                <div className="text-center py-6">
+                  <div className="text-4xl mb-3">✅</div>
+                  <p className="font-bold mb-1">Жалоба отправлена</p>
+                  <p className="text-xs text-muted-foreground">Мы рассмотрим её в ближайшее время</p>
+                  <button onClick={close} className="mt-4 w-full py-2 rounded-2xl bg-primary text-primary-foreground text-sm font-bold">Закрыть</button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2 mb-4">
+                    {REPORT_REASONS.map(r => (
+                      <button
+                        key={r}
+                        onClick={() => setReason(r)}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all border ${reason === r ? "bg-primary/15 border-primary/40 text-primary font-medium" : "border-border hover:bg-secondary text-foreground"}`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                  {reason && (
+                    <textarea
+                      value={details}
+                      onChange={e => setDetails(e.target.value)}
+                      placeholder="Подробности (необязательно)"
+                      rows={3}
+                      className="w-full rounded-xl px-3 py-2 text-sm bg-secondary border border-border resize-none outline-none focus:border-primary/50 mb-3"
+                    />
+                  )}
+                  <button
+                    onClick={submit}
+                    disabled={!reason || loading}
+                    className="w-full py-2.5 rounded-2xl bg-red-500 hover:bg-red-600 disabled:opacity-40 text-white text-sm font-bold transition-colors"
+                  >
+                    {loading ? "Отправка..." : "Отправить жалобу"}
+                  </button>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
 
 const BEG_PRESETS = [10, 25, 50, 100, 250];
 
@@ -351,24 +478,27 @@ export default function UserProfile() {
           <p className="text-xs text-muted-foreground">{isMe ? "мой профиль" : statusCfg.label}</p>
         </div>
         {!isMe && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="p-2 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
-                <MoreVertical size={20} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              {isContact ? (
-                <DropdownMenuItem onClick={handleRemoveContact} className="text-destructive focus:text-destructive">
-                  <UserMinus size={15} className="mr-2" /> Удалить из контактов
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={handleAddContact}>
-                  <UserPlus size={15} className="mr-2" /> Добавить в контакты
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <ReportUserDialog userId={Number(userId)} displayName={user.displayName} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-2 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
+                  <MoreVertical size={20} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {isContact ? (
+                  <DropdownMenuItem onClick={handleRemoveContact} className="text-destructive focus:text-destructive">
+                    <UserMinus size={15} className="mr-2" /> Удалить из контактов
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={handleAddContact}>
+                    <UserPlus size={15} className="mr-2" /> Добавить в контакты
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         )}
       </header>
 

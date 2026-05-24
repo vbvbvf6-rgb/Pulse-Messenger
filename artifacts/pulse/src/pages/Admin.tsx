@@ -147,7 +147,7 @@ export default function Admin() {
   const [giveLoading, setGiveLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"balance" | "password" | "actions" | "stats" | "gifts">("balance");
+  const [activeTab, setActiveTab] = useState<"balance" | "password" | "actions" | "stats">("balance");
   const [newPassword, setNewPassword] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);
@@ -364,6 +364,116 @@ export default function Admin() {
       }
     } catch { showToast("Ошибка соединения", "err"); }
     setAppealActionLoading(null);
+  };
+
+  // Platform Events
+  interface PlatformEvent {
+    id: number; title: string; description: string | null; imageUrl: string | null;
+    bannerColor: string; startAt: string | null; endAt: string | null; isActive: boolean; createdAt: string;
+  }
+  const [platformEvents, setPlatformEvents] = useState<PlatformEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [showEvents, setShowEvents] = useState(false);
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [showUserReports, setShowUserReports] = useState(false);
+  const [userReports, setUserReports] = useState<any[]>([]);
+  const [editingEvent, setEditingEvent] = useState<PlatformEvent | null>(null);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDesc, setEventDesc] = useState("");
+  const [eventImage, setEventImage] = useState("");
+  const [eventColor, setEventColor] = useState("#7c3aed");
+  const [eventStartAt, setEventStartAt] = useState("");
+  const [eventEndAt, setEventEndAt] = useState("");
+  const [eventActive, setEventActive] = useState(true);
+  const [eventSaving, setEventSaving] = useState(false);
+
+  const fetchPlatformEvents = async () => {
+    setEventsLoading(true);
+    try {
+      const res = await fetch("/api/admin/platform-events", { headers: getHeader() });
+      if (res.ok) setPlatformEvents(await res.json());
+    } catch {}
+    setEventsLoading(false);
+  };
+
+  const fetchUserReports = async () => {
+    try {
+      const res = await fetch("/api/admin/user-reports", { headers: getHeader() });
+      if (res.ok) setUserReports(await res.json());
+    } catch {}
+  };
+
+  const resolveUserReport = async (id: number, status: "reviewed" | "dismissed") => {
+    try {
+      await fetch(`/api/admin/user-reports/${id}`, {
+        method: "PATCH",
+        headers: { ...getHeader(), "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      setUserReports(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+    } catch {}
+  };
+
+  const openEventForm = (ev?: PlatformEvent) => {
+    if (ev) {
+      setEditingEvent(ev);
+      setEventTitle(ev.title);
+      setEventDesc(ev.description || "");
+      setEventImage(ev.imageUrl || "");
+      setEventColor(ev.bannerColor || "#7c3aed");
+      setEventStartAt(ev.startAt ? ev.startAt.slice(0, 16) : "");
+      setEventEndAt(ev.endAt ? ev.endAt.slice(0, 16) : "");
+      setEventActive(ev.isActive);
+    } else {
+      setEditingEvent(null);
+      setEventTitle(""); setEventDesc(""); setEventImage("");
+      setEventColor("#7c3aed"); setEventStartAt(""); setEventEndAt(""); setEventActive(true);
+    }
+    setShowEventForm(true);
+  };
+
+  const handleSaveEvent = async () => {
+    if (!eventTitle.trim()) return showToast("Введите заголовок", "err");
+    setEventSaving(true);
+    try {
+      const payload = {
+        title: eventTitle.trim(), description: eventDesc.trim() || null,
+        imageUrl: eventImage.trim() || null, bannerColor: eventColor,
+        startAt: eventStartAt || null, endAt: eventEndAt || null, isActive: eventActive,
+      };
+      const url = editingEvent ? `/api/admin/platform-events/${editingEvent.id}` : "/api/admin/platform-events";
+      const method = editingEvent ? "PATCH" : "POST";
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json", ...getHeader() }, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if (!res.ok) { showToast(data.error || "Ошибка", "err"); setEventSaving(false); return; }
+      showToast(editingEvent ? "✅ Событие обновлено" : "✅ Событие создано", "ok");
+      setShowEventForm(false);
+      fetchPlatformEvents();
+    } catch { showToast("Ошибка соединения", "err"); }
+    setEventSaving(false);
+  };
+
+  const handleDeleteEvent = async (id: number) => {
+    if (!confirm("Удалить событие?")) return;
+    try {
+      await fetch(`/api/admin/platform-events/${id}`, { method: "DELETE", headers: getHeader() });
+      showToast("🗑️ Событие удалено", "ok");
+      setPlatformEvents(prev => prev.filter(e => e.id !== id));
+    } catch { showToast("Ошибка", "err"); }
+  };
+
+  const handleToggleEventActive = async (ev: PlatformEvent) => {
+    try {
+      const res = await fetch(`/api/admin/platform-events/${ev.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getHeader() },
+        body: JSON.stringify({ isActive: !ev.isActive }),
+      });
+      if (res.ok) {
+        setPlatformEvents(prev => prev.map(e => e.id === ev.id ? { ...e, isActive: !e.isActive } : e));
+        showToast(!ev.isActive ? "✅ Событие активировано" : "⏸ Событие скрыто", "ok");
+      }
+    } catch { showToast("Ошибка", "err"); }
   };
 
   // Broadcast Push
@@ -1860,6 +1970,228 @@ export default function Admin() {
           </div>
         </div>
 
+        {/* Platform Events */}
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <button
+            onClick={() => { setShowEvents(v => !v); if (!showEvents && platformEvents.length === 0) fetchPlatformEvents(); }}
+            className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                <span className="text-violet-400 text-lg">🎉</span>
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">События / Ивенты</p>
+                <p className="text-xs text-muted-foreground">
+                  {platformEvents.filter(e => e.isActive).length > 0
+                    ? `${platformEvents.filter(e => e.isActive).length} активных`
+                    : "Управление событиями платформы"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {platformEvents.filter(e => e.isActive).length > 0 && (
+                <span className="w-5 h-5 rounded-full bg-violet-500 text-white text-[10px] font-black flex items-center justify-center">
+                  {platformEvents.filter(e => e.isActive).length}
+                </span>
+              )}
+              {showEvents ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+            </div>
+          </button>
+
+          {showEvents && (
+            <div className="border-t border-border">
+              <div className="p-2 border-b border-border flex justify-between items-center">
+                <button onClick={fetchPlatformEvents} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary transition-colors">
+                  <RefreshCw size={12} className={eventsLoading ? "animate-spin" : ""} /> Обновить
+                </button>
+                <button
+                  onClick={() => openEventForm()}
+                  className="text-xs bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25 font-semibold flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <Plus size={12} /> Новое событие
+                </button>
+              </div>
+
+              {showEventForm && (
+                <div className="p-4 border-b border-border bg-secondary/20 space-y-3">
+                  <p className="text-sm font-bold text-foreground">{editingEvent ? "Редактировать событие" : "Новое событие"}</p>
+                  <input
+                    value={eventTitle}
+                    onChange={e => setEventTitle(e.target.value)}
+                    placeholder="Заголовок события *"
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-500 transition-colors"
+                  />
+                  <textarea
+                    value={eventDesc}
+                    onChange={e => setEventDesc(e.target.value)}
+                    placeholder="Описание (необязательно)"
+                    rows={2}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-500 transition-colors resize-none"
+                  />
+                  <input
+                    value={eventImage}
+                    onChange={e => setEventImage(e.target.value)}
+                    placeholder="URL изображения (необязательно)"
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-violet-500 transition-colors"
+                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-muted-foreground mb-1 block">Начало</label>
+                      <input type="datetime-local" value={eventStartAt} onChange={e => setEventStartAt(e.target.value)}
+                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500 transition-colors" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] text-muted-foreground mb-1 block">Конец</label>
+                      <input type="datetime-local" value={eventEndAt} onChange={e => setEventEndAt(e.target.value)}
+                        className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-violet-500 transition-colors" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-muted-foreground">Цвет баннера:</label>
+                      <input type="color" value={eventColor} onChange={e => setEventColor(e.target.value)}
+                        className="w-8 h-8 rounded-lg border border-border cursor-pointer bg-transparent" />
+                      <span className="text-xs font-mono text-muted-foreground">{eventColor}</span>
+                    </div>
+                    <label className="flex items-center gap-2 ml-auto cursor-pointer">
+                      <span className="text-xs text-muted-foreground">Активно</span>
+                      <div onClick={() => setEventActive(v => !v)}
+                        className={`w-9 h-5 rounded-full border-2 transition-all relative cursor-pointer ${eventActive ? "bg-violet-500 border-violet-500" : "bg-secondary border-border"}`}>
+                        <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-all ${eventActive ? "left-4" : "left-0.5"}`} />
+                      </div>
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowEventForm(false)}
+                      className="flex-1 py-2 rounded-xl border border-border text-xs text-muted-foreground hover:bg-secondary transition-colors">
+                      Отмена
+                    </button>
+                    <button onClick={handleSaveEvent} disabled={eventSaving}
+                      className="flex-1 py-2 rounded-xl bg-violet-500 text-white text-xs font-bold hover:bg-violet-600 transition-colors disabled:opacity-50">
+                      {eventSaving ? "Сохраняем..." : editingEvent ? "Сохранить" : "Создать"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {eventsLoading ? (
+                <div className="p-6 flex justify-center"><RefreshCw size={20} className="animate-spin text-muted-foreground" /></div>
+              ) : platformEvents.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Нет событий. Создайте первое!</div>
+              ) : (
+                <div className="divide-y divide-border max-h-[480px] overflow-y-auto">
+                  {platformEvents.map(ev => (
+                    <div key={ev.id} className="p-3 flex items-start gap-3">
+                      <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: ev.isActive ? "#10b981" : "#6b7280" }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold truncate">{ev.title}</p>
+                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border ${ev.isActive ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10" : "text-muted-foreground border-border bg-secondary/50"}`}>
+                            {ev.isActive ? "АКТИВНО" : "СКРЫТО"}
+                          </span>
+                        </div>
+                        {ev.description && <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{ev.description}</p>}
+                        {(ev.startAt || ev.endAt) && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {ev.startAt ? `С ${new Date(ev.startAt).toLocaleDateString("ru-RU")}` : ""}
+                            {ev.endAt ? ` по ${new Date(ev.endAt).toLocaleDateString("ru-RU")}` : ""}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => handleToggleEventActive(ev)}
+                          className={`text-[10px] px-2 py-1 rounded-lg border transition-all ${ev.isActive ? "border-orange-500/30 text-orange-400 hover:bg-orange-500/10" : "border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"}`}>
+                          {ev.isActive ? "Скрыть" : "Показать"}
+                        </button>
+                        <button onClick={() => openEventForm(ev)}
+                          className="text-[10px] px-2 py-1 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-all">
+                          ✏️
+                        </button>
+                        <button onClick={() => handleDeleteEvent(ev.id)}
+                          className="text-[10px] px-2 py-1 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all">
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* User Reports */}
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <button
+            onClick={() => { setShowUserReports(v => !v); if (!showUserReports && userReports.length === 0) fetchUserReports(); }}
+            className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <span className="text-red-400 text-lg">🚩</span>
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-sm">Жалобы на пользователей</p>
+                <p className="text-xs text-muted-foreground">
+                  {userReports.filter(r => r.status === "pending").length > 0
+                    ? `${userReports.filter(r => r.status === "pending").length} новых`
+                    : "Просмотр жалоб"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {userReports.filter(r => r.status === "pending").length > 0 && (
+                <span className="w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
+                  {userReports.filter(r => r.status === "pending").length}
+                </span>
+              )}
+              {showUserReports ? <ChevronDown size={16} className="text-muted-foreground" /> : <ChevronRight size={16} className="text-muted-foreground" />}
+            </div>
+          </button>
+
+          {showUserReports && (
+            <div className="border-t border-border">
+              <div className="p-2 border-b border-border flex justify-end">
+                <button onClick={fetchUserReports} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary transition-colors">
+                  <RefreshCw size={12} /> Обновить
+                </button>
+              </div>
+              {userReports.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">Жалоб нет</div>
+              ) : (
+                <div className="divide-y divide-border max-h-[480px] overflow-y-auto">
+                  {userReports.map(r => (
+                    <div key={r.id} className={`p-3 transition-colors ${r.status !== "pending" ? "opacity-50" : "hover:bg-secondary/10"}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-semibold text-red-400">@{r.reporter_username}</span>
+                            <span className="text-xs text-muted-foreground">→</span>
+                            <span className="text-xs font-semibold">@{r.target_username}</span>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ml-auto ${r.status === "pending" ? "bg-yellow-500/20 text-yellow-400" : r.status === "reviewed" ? "bg-green-500/20 text-green-400" : "bg-secondary text-muted-foreground"}`}>
+                              {r.status === "pending" ? "Новая" : r.status === "reviewed" ? "Рассмотрена" : "Отклонена"}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium mt-0.5">{r.reason}</p>
+                          {r.details && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{r.details}</p>}
+                          <p className="text-[10px] text-muted-foreground mt-1">{new Date(r.created_at).toLocaleString("ru-RU")}</p>
+                        </div>
+                        {r.status === "pending" && (
+                          <div className="flex flex-col gap-1 shrink-0">
+                            <button onClick={() => resolveUserReport(r.id, "reviewed")} className="text-[10px] px-2 py-1 rounded-lg bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-all">✓</button>
+                            <button onClick={() => resolveUserReport(r.id, "dismissed")} className="text-[10px] px-2 py-1 rounded-lg border border-border text-muted-foreground hover:bg-secondary transition-all">✕</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Gift Catalog Editor */}
         <div className="bg-card border border-border rounded-2xl overflow-hidden">
           <button
@@ -2298,13 +2630,13 @@ export default function Admin() {
 
                 {/* Tabs */}
                 <div className="flex border-b border-border overflow-x-auto">
-                  {(["balance", "gifts", "actions", "password", "stats"] as const).map(t => (
+                  {(["balance", "actions", "password", "stats"] as const).map(t => (
                     <button
                       key={t}
                       onClick={() => setActiveTab(t)}
                       className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors whitespace-nowrap px-2 ${activeTab === t ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}
                     >
-                      {t === "balance" ? "⚡ Баланс" : t === "gifts" ? "🎁 Подарок" : t === "password" ? "🔐 Пароль" : t === "actions" ? "⚙️ Действия" : "📊 Статистика"}
+                      {t === "balance" ? "⚡ Баланс" : t === "password" ? "🔐 Пароль" : t === "actions" ? "⚙️ Действия" : "📊 Статистика"}
                     </button>
                   ))}
                 </div>
@@ -2362,135 +2694,6 @@ export default function Admin() {
                         </motion.button>
                       </div>
                     </>
-                  )}
-
-                  {/* Gifts tab */}
-                  {activeTab === "gifts" && (
-                    <div className="space-y-4">
-                      {/* Gift Prime Subscription */}
-                      <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-yellow-400/5 to-orange-500/10 overflow-hidden">
-                        <div className="flex items-center gap-3 px-4 pt-4 pb-2">
-                          <Crown size={18} className="text-amber-400 shrink-0" />
-                          <div>
-                            <p className="text-sm font-bold text-amber-300">Подарить подписку Prime</p>
-                            <p className="text-[10px] text-amber-400/70">Выдаётся без оплаты — административно</p>
-                          </div>
-                        </div>
-                        <div className="px-4 pb-4 grid grid-cols-4 gap-2">
-                          {([1, 3, 6, 12] as const).map(months => (
-                            <motion.button
-                              key={months}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleTogglePrime(true, months)}
-                              disabled={primeLoading || !!selectedUser.has_prime}
-                              className="flex flex-col items-center gap-1 p-2.5 rounded-xl border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/15 transition-all disabled:opacity-40"
-                            >
-                              <img src="/gifts/crown.png" alt="crown" className="w-8 h-8 object-contain" draggable={false} />
-                              <span className="text-[10px] font-black text-amber-300">{months} мес.</span>
-                            </motion.button>
-                          ))}
-                        </div>
-                        {selectedUser.has_prime && (
-                          <p className="text-center text-[10px] text-amber-400/60 pb-3">Prime уже активна у этого пользователя</p>
-                        )}
-                      </div>
-
-                      {/* Gift Catalog */}
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Выбрать подарок из каталога</p>
-                        {giftItemsLoading ? (
-                          <div className="grid grid-cols-3 gap-2">
-                            {Array.from({ length: 9 }).map((_, i) => (
-                              <div key={i} className="h-24 rounded-xl bg-secondary/50 animate-pulse" />
-                            ))}
-                          </div>
-                        ) : giftItems.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-6">Каталог подарков пуст</p>
-                        ) : (
-                          <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                            {giftItems.map(gift => {
-                              const rarityBorder =
-                                gift.rarity === "cosmic" ? "border-violet-500/50 bg-violet-500/8" :
-                                gift.rarity === "legendary" ? "border-amber-500/50 bg-amber-500/8" :
-                                gift.rarity === "epic" ? "border-purple-500/50 bg-purple-500/8" :
-                                gift.rarity === "rare" ? "border-blue-500/40 bg-blue-500/6" :
-                                "border-border/60 bg-secondary/20";
-                              const isSelected = selectedGiftId === gift.id;
-                              return (
-                                <motion.button
-                                  key={gift.id}
-                                  whileHover={{ scale: 1.04, y: -2 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => setSelectedGiftId(isSelected ? null : gift.id)}
-                                  className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl border-2 transition-all ${isSelected ? "border-primary bg-primary/10 ring-2 ring-primary/25 shadow-lg shadow-primary/20" : rarityBorder}`}
-                                  title={gift.name}
-                                >
-                                  <div className="w-10 h-10 flex items-center justify-center">
-                                    <AdminGiftThumb name={gift.name} emoji={gift.emoji} size={40} />
-                                  </div>
-                                  <span className="text-[9px] text-foreground/80 font-semibold truncate w-full text-center leading-tight">{gift.name}</span>
-                                  <span className="text-[8px] font-black text-yellow-400">⚡ {gift.price}</span>
-                                  {isSelected && (
-                                    <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-primary flex items-center justify-center">
-                                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4l1.8 1.8L6.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                    </div>
-                                  )}
-                                </motion.button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {selectedGiftId && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="space-y-3 pt-1"
-                        >
-                          {(() => {
-                            const g = giftItems.find(x => x.id === selectedGiftId);
-                            return g ? (
-                              <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20">
-                                <div className="w-10 h-10 flex items-center justify-center shrink-0">
-                                  <AdminGiftThumb name={g.name} emoji={g.emoji} size={40} />
-                                </div>
-                                <div>
-                                  <p className="text-sm font-bold">{g.name}</p>
-                                  <p className="text-[10px] text-muted-foreground capitalize">{g.rarity} · ⭐ {g.stars}</p>
-                                </div>
-                              </div>
-                            ) : null;
-                          })()}
-                          <input
-                            value={giftMessage}
-                            onChange={e => setGiftMessage(e.target.value)}
-                            placeholder="Сопроводительное сообщение (необязательно)..."
-                            className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
-                          />
-                          <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                            <div
-                              onClick={() => setGiftAnonymous(v => !v)}
-                              className={`w-9 h-5 rounded-full border-2 transition-all relative ${giftAnonymous ? "bg-primary border-primary" : "bg-secondary border-border"}`}
-                            >
-                              <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-all ${giftAnonymous ? "left-4" : "left-0.5"}`} />
-                            </div>
-                            <span className="text-xs text-muted-foreground">Анонимно (скрыть отправителя)</span>
-                          </label>
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.97 }}
-                            onClick={handleGiveGift}
-                            disabled={giftLoading}
-                            className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            <Gift size={16} />
-                            {giftLoading ? "Отправляем..." : `Подарить @${selectedUser.username}`}
-                          </motion.button>
-                        </motion.div>
-                      )}
-                    </div>
                   )}
 
                   {/* Password tab */}

@@ -625,6 +625,60 @@ const TOPICS = [
 
 type TopicId = typeof TOPICS[number]["id"];
 
+function ActiveEvents() {
+  const [events, setEvents] = React.useState<any[]>([]);
+  const [dismissed, setDismissed] = React.useState<Set<number>>(new Set());
+
+  React.useEffect(() => {
+    const token = sessionStorage.getItem("pulse-token");
+    if (!token) return;
+    fetch("/api/platform-events", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setEvents(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  const visible = events.filter(e => !dismissed.has(e.id));
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      {visible.map(ev => (
+        <motion.div
+          key={ev.id}
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          className="rounded-2xl overflow-hidden border border-white/10"
+          style={{ background: `linear-gradient(135deg, ${ev.bannerColor || "#7c3aed"}22, ${ev.bannerColor || "#7c3aed"}11)`, borderColor: `${ev.bannerColor || "#7c3aed"}40` }}
+        >
+          <div className="p-4 flex items-start gap-3">
+            {ev.imageUrl && (
+              <img src={ev.imageUrl} alt="" className="w-14 h-14 rounded-xl object-cover shrink-0" />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎉</span>
+                <p className="font-bold text-sm text-foreground truncate">{ev.title}</p>
+                <div className="ml-auto shrink-0 flex items-center gap-1">
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: `${ev.bannerColor || "#7c3aed"}30`, color: ev.bannerColor || "#7c3aed" }}>EVENT</span>
+                  <button onClick={() => setDismissed(prev => new Set([...prev, ev.id]))} className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors"><X size={13} /></button>
+                </div>
+              </div>
+              {ev.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{ev.description}</p>}
+              {(ev.startAt || ev.endAt) && (
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  {ev.endAt ? `До ${new Date(ev.endAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}` : ""}
+                </p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
 function TrendingTopicsWidget({ posts, onTopicClick, selectedTopic }: {
   posts: any[];
   onTopicClick: (id: string) => void;
@@ -848,46 +902,13 @@ export default function Feed() {
           </button>
         </div>
 
-        {/* TikTok-style topic filter chips */}
-        <div className="px-3 pb-3 flex gap-2 overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => setSelectedTopic(null)}
-            className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0 border transition-all ${
-              selectedTopic === null
-                ? "bg-foreground text-background border-transparent"
-                : "bg-transparent border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
-            }`}
-          >
-            <Hash size={10} /> Все темы
-          </button>
-          {TOPICS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setSelectedTopic(prev => prev === t.id ? null : t.id)}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap shrink-0 border transition-all ${
-                selectedTopic === t.id
-                  ? `bg-gradient-to-r ${t.color} border-current`
-                  : "bg-transparent border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-              }`}
-            >
-              <span>{t.emoji}</span> {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Active hint bar */}
-        {activeTopic && (
-          <div className="px-5 pb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span>{activeTopic.emoji}</span>
-            <span className="font-semibold text-foreground/70">{activeTopic.label}</span>
-            <span className="ml-auto text-primary/60 font-medium">{filteredPosts.length} публ.</span>
-          </div>
-        )}
       </header>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin pb-24 md:pb-0">
         <div className="max-w-5xl mx-auto p-4 flex gap-5 items-start">
         <div className="flex-1 min-w-0 space-y-4">
+
+          <ActiveEvents />
 
           <AnimatePresence>
             {showCreatePost && (

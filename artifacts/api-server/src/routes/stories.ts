@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, storiesTable, storyViewsTable, usersTable, contactsTable } from "@workspace/db";
-import { eq, and, gt, inArray, desc } from "drizzle-orm";
+import { eq, and, gt, inArray, desc, count } from "drizzle-orm";
 import { CreateStoryBody } from "@workspace/api-zod";
 import { getBanwords, findBanword } from "../lib/banwords";
 
@@ -59,7 +59,6 @@ router.post("/stories", async (req, res) => {
   try {
     const uid = req.currentUserId;
     const body = CreateStoryBody.parse(req.body);
-    // Banword check
     if (body.text) {
       const banwords = await getBanwords();
       const hit = findBanword(body.text, banwords);
@@ -79,6 +78,49 @@ router.post("/stories", async (req, res) => {
     }).returning();
     const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, uid) });
     res.status(201).json({ ...story, isViewed: false, user });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/stories/:storyId/view", async (req, res) => {
+  try {
+    const storyId = Number(req.params.storyId);
+    const uid = req.currentUserId;
+    if (!storyId) return res.status(400).json({ error: "Invalid story id" });
+
+    const story = await db.query.storiesTable.findFirst({ where: eq(storiesTable.id, storyId) });
+    if (!story) return res.status(404).json({ error: "Story not found" });
+    if (story.userId === uid) return res.json({ ok: true });
+
+    const existing = await db.select()
+      .from(storyViewsTable)
+      .where(and(eq(storyViewsTable.storyId, storyId), eq(storyViewsTable.viewerId, uid)))
+      .limit(1);
+
+    if (existing.length === 0) {
+      await db.insert(storyViewsTable).values({ storyId, viewerId: uid });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/stories/:storyId/views", async (req, res) => {
+  try {
+    const storyId = Number(req.params.storyId);
+    const uid = req.currentUserId;
+    if (!storyId) return res.status(400).json({ error: "Invalid story id" });
+
+    const story = await db.query.storiesTable.findFirst({ where: eq(storiesTable.id, storyId) });
+    if (!story) return res.status(404).json({ error: "Story not found" });
+    if (story.userId !== uid) return res.status(403).json({ error: "Forbidden" });
+
+    const [result] = await db.select({ cnt: count() }).from(storyViewsTable).where(eq(storyViewsTable.storyId, storyId));
+    res.json({ count: Number(result?.cnt ?? 0) });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

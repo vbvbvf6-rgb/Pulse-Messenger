@@ -17,7 +17,6 @@ import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import Home from "@/pages/Home";
 import Calls from "@/pages/Calls";
 import Contacts from "@/pages/Contacts";
-import Gifts from "@/pages/Gifts";
 import Stories from "@/pages/Stories";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
@@ -180,8 +179,7 @@ function MainAppInner({ onLogout, onSwitchAccount, onRemoveAccount, onOpenAddAcc
               <Route path="/calls" component={Calls} />
               <Route path="/feed" component={Feed} />
               <Route path="/contacts" component={Contacts} />
-              <Route path="/gifts" component={Gifts} />
-              <Route path="/stories" component={Stories} />
+                    <Route path="/stories" component={Stories} />
               <Route path="/wallet" component={Wallet} />
               <Route path="/admin" component={Admin} />
               <Route path="/prime" component={Prime} />
@@ -377,14 +375,11 @@ function App() {
     persistAndSwitch(id);
   };
 
-  const scale = zoom / 100;
-
   return (
     <div style={{
-      transform: `scale(${scale})`,
-      transformOrigin: "top left",
-      width: `${100 / scale}%`,
-      height: `${100 / scale}vh`,
+      zoom: `${zoom}%`,
+      height: `${(100 / (zoom / 100)).toFixed(4)}dvh`,
+      width: `${(100 / (zoom / 100)).toFixed(4)}%`,
       overflow: "hidden",
     }}>
     <LanguageProvider>

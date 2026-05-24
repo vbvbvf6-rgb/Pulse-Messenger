@@ -1,10 +1,12 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useGetStories, useCreateStory, getGetStoriesQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Play, Plus, X, Type, Image as ImageIcon, Upload } from "lucide-react";
+import { Play, Plus, X, Type, Image as ImageIcon, Upload, Eye } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
+
+const STORY_DURATION = 5000;
 
 async function compressStoryImage(file: File, maxPx = 1280, quality = 0.85): Promise<string> {
   return new Promise((resolve) => {
@@ -39,6 +41,30 @@ const BG_COLORS = [
   "#386641", "#6a994e", "#a7c957",
 ];
 
+async function markStoryViewed(storyId: number) {
+  const token = sessionStorage.getItem("pulse-token");
+  if (!token) return;
+  try {
+    await fetch(`/api/stories/${storyId}/view`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+  } catch {}
+}
+
+async function fetchStoryViews(storyId: number): Promise<number> {
+  const token = sessionStorage.getItem("pulse-token");
+  if (!token) return 0;
+  try {
+    const res = await fetch(`/api/stories/${storyId}/views`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.count ?? 0;
+  } catch { return 0; }
+}
+
 export default function Stories() {
   const { data: stories, isLoading } = useGetStories();
   const createStoryMutation = useCreateStory();
@@ -55,6 +81,21 @@ export default function Stories() {
   const [createError, setCreateError] = useState("");
   const [viewingGroup, setViewingGroup] = useState<any>(null);
   const [viewingIndex, setViewingIndex] = useState(0);
+  const [viewCount, setViewCount] = useState<number | null>(null);
+  const currentUserId = Number(sessionStorage.getItem("pulse-user-id") || "0");
+
+  useEffect(() => {
+    if (!viewingGroup) return;
+    const story = viewingGroup.stories[viewingIndex];
+    if (!story) return;
+    markStoryViewed(story.id);
+    if (story.userId === currentUserId || viewingGroup.user?.id === currentUserId) {
+      setViewCount(null);
+      fetchStoryViews(story.id).then(setViewCount);
+    } else {
+      setViewCount(null);
+    }
+  }, [viewingGroup?.user?.id, viewingIndex]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -94,6 +135,21 @@ export default function Stories() {
   const openViewer = (group: any, index = 0) => {
     setViewingGroup(group);
     setViewingIndex(index);
+  };
+
+  const goNext = () => {
+    if (!viewingGroup) return;
+    if (viewingIndex < viewingGroup.stories.length - 1) {
+      setViewingIndex(i => i + 1);
+    } else {
+      setViewingGroup(null);
+    }
+  };
+
+  const goPrev = () => {
+    if (viewingIndex > 0) {
+      setViewingIndex(i => i - 1);
+    }
   };
 
   return (
@@ -310,71 +366,124 @@ export default function Stories() {
       </Dialog>
 
       <AnimatePresence>
-        {viewingGroup && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-          >
-            <div className="relative w-full max-w-sm h-full max-h-screen">
-              {(() => {
-                const story = viewingGroup.stories[viewingIndex];
-                return (
+        {viewingGroup && (() => {
+          const story = viewingGroup.stories[viewingIndex];
+          const isOwnStory = viewingGroup.user?.id === currentUserId;
+          return (
+            <motion.div
+              key="story-viewer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black"
+            >
+              <div className="relative w-full h-full flex items-stretch justify-center">
+                <div className="relative w-full max-w-[430px] mx-auto h-full overflow-hidden">
                   <div
-                    className="w-full h-full flex items-center justify-center"
+                    className="absolute inset-0 w-full h-full"
                     style={{ backgroundColor: story?.backgroundColor || "#111" }}
                   >
                     {story?.type === "image" && story.mediaUrl && (
-                      <img src={story.mediaUrl} alt="" className="w-full h-full object-contain" />
+                      <img
+                        src={story.mediaUrl}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                     )}
                     {story?.type === "text" && (
-                      <p className="text-white font-bold text-2xl text-center px-8 drop-shadow-lg">{story.text}</p>
+                      <div className="w-full h-full flex items-center justify-center p-8">
+                        <p className="text-white font-bold text-2xl text-center leading-tight drop-shadow-lg">
+                          {story.text}
+                        </p>
+                      </div>
+                    )}
+                    {story?.text && story?.type === "image" && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6 pb-20">
+                        <p className="text-white text-base font-medium text-center drop-shadow">{story.text}</p>
+                      </div>
                     )}
                   </div>
-                );
-              })()}
 
-              <div className="absolute top-0 left-0 right-0 p-4 flex gap-1">
-                {viewingGroup.stories.map((_: any, i: number) => (
-                  <div key={i} className="h-0.5 flex-1 bg-white/30 rounded-full overflow-hidden">
-                    <div className={`h-full bg-white ${i <= viewingIndex ? "w-full" : "w-0"} transition-all`} />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/40 pointer-events-none" />
+
+                  <div className="absolute top-0 left-0 right-0 flex gap-1 px-3 pt-3 z-10"
+                    style={{ paddingTop: "max(12px, env(safe-area-inset-top, 12px))" }}
+                  >
+                    {viewingGroup.stories.map((_: any, i: number) => (
+                      <div key={i} className="h-[3px] flex-1 bg-white/30 rounded-full overflow-hidden">
+                        {i < viewingIndex && (
+                          <div className="h-full bg-white w-full" />
+                        )}
+                        {i === viewingIndex && (
+                          <motion.div
+                            key={`prog-${viewingGroup.user?.id}-${viewingIndex}`}
+                            className="h-full bg-white rounded-full"
+                            initial={{ width: "0%" }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: STORY_DURATION / 1000, ease: "linear" }}
+                            onAnimationComplete={goNext}
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              <div className="absolute top-8 left-4 flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden border-2 border-white"
-                  style={{ backgroundColor: viewingGroup.user.avatarColor }}
-                >
-                  {viewingGroup.user.avatarUrl ? (
-                    <img src={viewingGroup.user.avatarUrl} alt="" className="w-full h-full object-cover" />
-                  ) : viewingGroup.user.displayName[0].toUpperCase()}
+                  <div className="absolute left-4 right-16 flex items-center gap-3 z-10"
+                    style={{ top: "max(52px, calc(env(safe-area-inset-top, 0px) + 40px))" }}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden border-2 border-white shrink-0"
+                      style={{ backgroundColor: viewingGroup.user.avatarColor }}
+                    >
+                      {viewingGroup.user.avatarUrl ? (
+                        <img src={viewingGroup.user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : viewingGroup.user.displayName[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-white font-bold drop-shadow-md text-sm">{viewingGroup.user.displayName}</span>
+                      {isOwnStory && viewCount !== null && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Eye size={11} className="text-white/70" />
+                          <span className="text-white/70 text-[11px]">{viewCount} просмотр{viewCount === 1 ? "" : viewCount >= 2 && viewCount <= 4 ? "а" : "ов"}</span>
+                        </div>
+                      )}
+                      {isOwnStory && viewCount === null && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <Eye size={11} className="text-white/40" />
+                          <span className="text-white/40 text-[11px]">Загрузка...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setViewingGroup(null)}
+                    className="absolute z-10 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+                    style={{ top: "max(52px, calc(env(safe-area-inset-top, 0px) + 40px))", right: "16px" }}
+                  >
+                    <X size={20} />
+                  </button>
+
+                  <div className="absolute top-0 bottom-0 left-0 right-0 flex z-[5]" style={{ top: "120px" }}>
+                    <div
+                      className="flex-1 cursor-pointer"
+                      onClick={goPrev}
+                    />
+                    <div
+                      className="flex-1 cursor-pointer"
+                      onClick={goNext}
+                    />
+                  </div>
                 </div>
-                <span className="text-white font-bold drop-shadow-md">{viewingGroup.user.displayName}</span>
-              </div>
 
-              <button
-                onClick={() => setViewingGroup(null)}
-                className="absolute top-8 right-4 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors"
-              >
-                <X size={20} />
-              </button>
-
-              <div className="absolute top-20 bottom-0 left-0 right-0 flex">
-                <div className="flex-1 cursor-pointer" onClick={() => setViewingIndex(i => Math.max(0, i - 1))} />
-                <div className="flex-1 cursor-pointer" onClick={() => {
-                  if (viewingIndex < viewingGroup.stories.length - 1) {
-                    setViewingIndex(i => i + 1);
-                  } else {
-                    setViewingGroup(null);
-                  }
-                }} />
+                <div
+                  className="hidden md:block flex-1 bg-black/80 cursor-pointer"
+                  onClick={() => setViewingGroup(null)}
+                />
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          );
+        })()}
       </AnimatePresence>
     </div>
   );

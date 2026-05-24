@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Trophy, Users, Crown, BadgeCheck, Medal } from "lucide-react";
+import { Trophy, Users, Crown, BadgeCheck, Medal, MessageSquare, Zap } from "lucide-react";
 import { useGetMe } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
+
+type Tab = "referral" | "messages" | "balance";
 
 const TOKEN_KEY = "pulse-token";
 const getToken = () => sessionStorage.getItem(TOKEN_KEY);
@@ -154,7 +156,7 @@ function ReferralLeaderboard({ me }: { me: any }) {
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-16 rounded-2xl" />)}
         </div>
-      ) : leaderboard.length === 0 ? (
+      ) : !Array.isArray(leaderboard) || leaderboard.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Users size={40} className="mx-auto mb-3 opacity-30" />
           <p className="font-bold">Пока никто не пригласил друзей</p>
@@ -205,23 +207,20 @@ function ReferralLeaderboard({ me }: { me: any }) {
   );
 }
 
-function StatsLeaderboard({ tab }: { tab: Tab }) {
+function StatsLeaderboard({ tab, me }: { tab: Tab; me: any }) {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["leaderboard-stats", tab],
     queryFn: () => apiFetch(`/api/leaderboard?sort=${tab}`),
     refetchInterval: 60000,
   });
-  const { data: me } = useGetMe();
 
   const getValue = (u: any) => {
-    if (tab === "gifts") return u.giftsReceived ?? u.gifts_received ?? 0;
     if (tab === "messages") return u.messagesSent ?? u.messages_sent ?? 0;
     if (tab === "balance") return Number(u.balance ?? 0);
     return 0;
   };
 
   const getLabel = (u: any) => {
-    if (tab === "gifts") return `${getValue(u)} подарк${getValue(u) === 1 ? "" : "ов"}`;
     if (tab === "messages") return `${Number(getValue(u)).toLocaleString()} сообщ.`;
     if (tab === "balance") return `${Number(getValue(u)).toLocaleString()} ⚡`;
     return "";
@@ -237,6 +236,7 @@ function StatsLeaderboard({ tab }: { tab: Tab }) {
     <div className="text-center py-12 text-muted-foreground">
       <Trophy size={40} className="mx-auto mb-3 opacity-30" />
       <p className="font-bold">Нет данных</p>
+      <p className="text-sm mt-1">Станьте первым в рейтинге!</p>
     </div>
   );
 
@@ -278,8 +278,15 @@ function StatsLeaderboard({ tab }: { tab: Tab }) {
   );
 }
 
+const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
+  { key: "referral", label: "Рефералы", icon: <Users size={14} /> },
+  { key: "messages", label: "Сообщения", icon: <MessageSquare size={14} /> },
+  { key: "balance", label: "Баланс", icon: <Zap size={14} /> },
+];
+
 export default function Leaderboard() {
   const { data: me } = useGetMe();
+  const [activeTab, setActiveTab] = useState<Tab>("referral");
 
   return (
     <div className="flex-1 flex flex-col h-full bg-background overflow-hidden">
@@ -291,13 +298,35 @@ export default function Leaderboard() {
       </header>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 py-6 pb-24 md:pb-6">
+        <div className="max-w-2xl mx-auto px-4 pt-5 pb-24 md:pb-6">
+          <div className="flex gap-1 p-1 bg-secondary/60 rounded-2xl mb-6 border border-border/50">
+            {TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === tab.key
+                    ? "bg-background text-foreground shadow-sm border border-border/50"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.icon}
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
           <motion.div
+            key={activeTab}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.15 }}
           >
-            <ReferralLeaderboard me={me} />
+            {activeTab === "referral" ? (
+              <ReferralLeaderboard me={me} />
+            ) : (
+              <StatsLeaderboard tab={activeTab} me={me} />
+            )}
           </motion.div>
         </div>
       </div>

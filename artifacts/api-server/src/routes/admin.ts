@@ -1021,4 +1021,37 @@ router.delete("/admin/banwords/:id", requireAdmin, async (req, res) => {
   }
 });
 
+/* ── User Reports ──────────────────────────────────────────────── */
+
+router.get("/admin/user-reports", requireAdmin, async (req, res) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT ur.id, ur.reason, ur.details, ur.status, ur.created_at,
+        r.id AS reporter_id, r.display_name AS reporter_name, r.username AS reporter_username,
+        t.id AS target_id, t.display_name AS target_name, t.username AS target_username
+      FROM user_reports ur
+      JOIN users r ON r.id = ur.reporter_id
+      JOIN users t ON t.id = ur.target_id
+      ORDER BY ur.created_at DESC
+      LIMIT 100
+    `);
+    res.json(rows.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/admin/user-reports/:id", requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { status } = req.body as { status: string };
+    await db.execute(sql`UPDATE user_reports SET status = ${status}, reviewed_at = NOW() WHERE id = ${id}`);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
