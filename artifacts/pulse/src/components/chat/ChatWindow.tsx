@@ -11,6 +11,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
+import { ChannelThread } from "./ChannelThread";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -332,6 +333,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     return sessionStorage.getItem(`ann-dismissed-${chatId}`) === "1";
   });
   const [replyChipText, setReplyChipText] = useState<string | null>(null);
+  const [threadMessage, setThreadMessage] = useState<Message | null>(null);
   const [typingOutMsgId, setTypingOutMsgId] = useState<number | null>(null);
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
   const [createGroupName, setCreateGroupName] = useState("");
@@ -1244,6 +1246,8 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
                   searchHighlight={isMatch ? searchQuery : undefined}
                   isActiveMatch={isActive}
                   messageRef={(el) => { messageRefs.current[message.id] = el; }}
+                  isChannel={isChannel}
+                  onComment={(msg) => setThreadMessage(msg)}
                 />
               );
             })}
@@ -1389,6 +1393,19 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
           }, 100);
         }}
       />
+
+      <AnimatePresence>
+        {threadMessage && (
+          <ChannelThread
+            messageId={threadMessage.id}
+            chatId={chatId}
+            parentText={(threadMessage as any).text}
+            parentSender={(threadMessage as any).sender?.displayName}
+            currentUserId={currentUserId ?? 0}
+            onClose={() => setThreadMessage(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showInfoPanel && (

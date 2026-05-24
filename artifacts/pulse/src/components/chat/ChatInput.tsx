@@ -5,6 +5,7 @@ import type { P2PChannel } from "@/hooks/useP2PChannel";
 import { useQueryClient } from "@tanstack/react-query";
 import { Paperclip, Mic, SendHorizontal, X, Square, Trash2, Images, Reply, Pencil, Clock, BarChart2, Plus, Minus, Wand2, CalendarClock, Hourglass, Sticker } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { MemeGifPicker } from "./MemeGifPicker";
 
 const STICKERS = [
   { id: "sticker-01", url: "/stickers/sticker-01.svg", label: "Счастье" },
@@ -99,6 +100,10 @@ const BOT_COMMANDS = [
   { command: "/help", description: "Получить справку" },
 ];
 
+const GENERAL_COMMANDS = [
+  { command: "/memer", description: "Отправить GIF-мем 🎭" },
+];
+
 export interface ChatInputProps {
   chatId: number;
   onMessageSent?: () => void;
@@ -140,6 +145,7 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
   const [stickerTab, setStickerTab] = useState<"regular" | "prime">("regular");
   const [selectedEffect, setSelectedEffect] = useState<string | null>(null);
   const [showEffectPicker, setShowEffectPicker] = useState(false);
+  const [showMemeGifPicker, setShowMemeGifPicker] = useState(false);
 
   const isPrimePlus = !!(me as any)?.hasPrime && (me as any)?.primeTier === "prime_plus";
   const isPrime = !!(me as any)?.hasPrime;
@@ -337,6 +343,13 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
       return;
     }
 
+    if (text.trim() === "/memer") {
+      setText("");
+      if (textareaRef.current) textareaRef.current.style.height = "44px";
+      setShowMemeGifPicker(true);
+      setIsSending(false);
+      return;
+    }
     if (!text.trim() && imagePreviews.length === 0 && !audioBlob) return;
     setIsSending(true);
     try {
@@ -506,6 +519,24 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
     chunksRef.current = [];
   };
 
+  const sendGif = async (gifUrl: string) => {
+    setText("");
+    setShowMemeGifPicker(false);
+    if (textareaRef.current) textareaRef.current.style.height = "44px";
+    setIsSending(true);
+    try {
+      const sent = await sendMessage.mutateAsync({
+        data: { chatId, type: "image", mediaUrl: gifUrl, text: "gif" },
+      });
+      if (sent) p2p?.send(sent as Message);
+      queryClient.invalidateQueries({ queryKey: getGetMessagesQueryKey({ chatId }) });
+      queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() });
+      onMessageSent?.();
+    } catch {} finally {
+      setIsSending(false);
+    }
+  };
+
   const insertEmoji = (emoji: string) => {
     setText(prev => prev + emoji);
     textareaRef.current?.focus();
@@ -530,13 +561,23 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
   const filteredCommands = BOT_COMMANDS.filter(c =>
     c.command.startsWith(text.split(" ")[0].toLowerCase())
   );
+  const showGeneralCommandMenu = !isBot && !editMessage && text.startsWith("/") && text.length > 0 && !showMemeGifPicker;
+  const filteredGeneralCommands = GENERAL_COMMANDS.filter(c =>
+    c.command.startsWith(text.split(" ")[0].toLowerCase())
+  );
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
+    const val = e.target.value;
+    setText(val);
     e.target.style.height = "44px";
     e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
-    if (e.target.value.trim()) sendTypingEvent("text");
-    if (!editMessage) localStorage.setItem(draftKey, e.target.value);
+    if (val.trim()) sendTypingEvent("text");
+    if (!editMessage) localStorage.setItem(draftKey, val);
+    if (val === "/memer") {
+      setShowMemeGifPicker(true);
+    } else if (showMemeGifPicker) {
+      setShowMemeGifPicker(false);
+    }
   };
 
   const handleScheduledSend = async () => {
@@ -726,6 +767,49 @@ export function ChatInput({ chatId, onMessageSent, replyTo, editMessage, onCance
                   )}
                 </div>
               )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showMemeGifPicker && (
+            <MemeGifPicker
+              onSelect={sendGif}
+              onClose={() => { setShowMemeGifPicker(false); setText(""); }}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showGeneralCommandMenu && filteredGeneralCommands.length > 0 && !showMemeGifPicker && (
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.97 }}
+              className="absolute bottom-full mb-2 left-0 right-0 z-50 bg-card border border-border rounded-[20px] shadow-2xl overflow-hidden"
+            >
+              <div className="px-4 py-2 border-b border-border">
+                <span className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">Команды</span>
+              </div>
+              {filteredGeneralCommands.map((cmd) => (
+                <button
+                  key={cmd.command}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    if (cmd.command === "/memer") {
+                      setText("");
+                      setShowMemeGifPicker(true);
+                    } else {
+                      setText(cmd.command + " ");
+                    }
+                    textareaRef.current?.focus();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary transition-colors text-left"
+                >
+                  <span className="text-[15px] font-black text-primary">{cmd.command}</span>
+                  <span className="text-[13px] text-muted-foreground">{cmd.description}</span>
+                </button>
+              ))}
             </motion.div>
           )}
         </AnimatePresence>

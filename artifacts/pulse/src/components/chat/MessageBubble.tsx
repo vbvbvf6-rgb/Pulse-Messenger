@@ -5,7 +5,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { getGetMessagesQueryKey, getGetChatsQueryKey } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
-import { Check, CheckCheck, Clock, X, Info, Play, Pause, Mic, Reply, Pencil, Trash2, Copy, SmilePlus, Languages, Pin, PinOff, BarChart2, Eye, Crown, Wand2 } from "lucide-react";
+import { Check, CheckCheck, Clock, X, Info, Play, Pause, Mic, Reply, Pencil, Trash2, Copy, SmilePlus, Languages, Pin, PinOff, BarChart2, Eye, Crown, Wand2, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertDialog,
@@ -338,6 +338,8 @@ export interface MessageBubbleProps {
   searchHighlight?: string;
   isActiveMatch?: boolean;
   messageRef?: React.RefCallback<HTMLDivElement>;
+  isChannel?: boolean;
+  onComment?: (msg: Message) => void;
 }
 
 function HighlightText({ text, query, isMine }: { text: string; query: string; isMine: boolean }) {
@@ -364,7 +366,7 @@ function HighlightText({ text, query, isMine }: { text: string; query: string; i
   );
 }
 
-export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin, typingOut, onTypingDone, searchHighlight, isActiveMatch, messageRef }: MessageBubbleProps) {
+export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin, typingOut, onTypingDone, searchHighlight, isActiveMatch, messageRef, isChannel, onComment }: MessageBubbleProps) {
   const { currentUserId } = useAppContext();
   const { data: me } = useGetMe();
   const queryClient = useQueryClient();
@@ -1048,6 +1050,19 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
                     )}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Channel comments button */}
+            {isChannel && !(message as any).replyToId && onComment && (
+              <div className={cn("mt-1.5", isMine ? "flex justify-end" : "flex justify-start")}>
+                <button
+                  onClick={() => onComment(message)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/60 border border-border hover:border-primary/30 hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all text-[12px] font-bold group"
+                >
+                  <MessageSquare size={12} className="group-hover:scale-110 transition-transform" />
+                  Комментарии
+                </button>
               </div>
             )}
 

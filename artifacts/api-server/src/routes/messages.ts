@@ -624,6 +624,32 @@ router.delete("/messages/scheduled/:id", async (req, res) => {
   }
 });
 
+router.get("/messages/:messageId/thread", async (req, res) => {
+  try {
+    const uid = req.currentUserId;
+    const messageId = Number(req.params.messageId);
+    if (!messageId || isNaN(messageId)) {
+      return res.status(400).json({ error: "Invalid messageId" });
+    }
+    const parentMsg = await db.query.messagesTable.findFirst({ where: eq(messagesTable.id, messageId) });
+    if (!parentMsg) return res.status(404).json({ error: "Сообщение не найдено" });
+    if (!(await isChatMember(parentMsg.chatId, uid))) {
+      return res.status(403).json({ error: "Нет доступа" });
+    }
+    const { isPrimePlus } = await getUserPrimeInfo(uid);
+    const replies = await db
+      .select()
+      .from(messagesTable)
+      .where(and(eq(messagesTable.replyToId, messageId), eq(messagesTable.isDeleted, false)))
+      .orderBy(messagesTable.createdAt);
+    const built = await Promise.all(replies.map(m => buildMessage(m, isPrimePlus)));
+    res.json(built);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.put("/messages/:messageId", async (req, res) => {
   try {
     const messageId = Number(req.params.messageId);
