@@ -5,9 +5,11 @@ import { useAppContext } from "@/contexts/AppContext";
 import { ActiveCall } from "@/components/calls/ActiveCall";
 import { IncomingCall } from "@/components/calls/IncomingCall";
 import { CommandPalette } from "@/components/CommandPalette";
+import { useToast } from "@/hooks/use-toast";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { activeCall } = useAppContext();
+  const { toast } = useToast();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -21,6 +23,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { message: string };
+      toast({ title: "Ошибка звонка", description: detail?.message, variant: "destructive" });
+    };
+    window.addEventListener("pulse:call-error", handler);
+    return () => window.removeEventListener("pulse:call-error", handler);
+  }, [toast]);
 
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden bg-background text-foreground">

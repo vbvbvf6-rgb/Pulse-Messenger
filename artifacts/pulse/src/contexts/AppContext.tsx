@@ -3,12 +3,18 @@ import { io, Socket } from "socket.io-client";
 import { Call } from "@workspace/api-client-react";
 import { getSavedAccounts, SavedAccount, MAX_ACCOUNTS } from "@/lib/accounts";
 
-// Free STUN (NAT traversal discovery) + Free TURN relay via Open Relay Project.
-// TURN is essential for users behind symmetric NAT (mobile networks, corporate routers etc).
-// Open Relay Project: https://www.metered.ca/tools/openrelay/ — completely free, no signup.
+// STUN servers for NAT traversal (multiple providers for reliability).
+// TURN relay servers are used when direct/STUN connections are blocked (symmetric NAT, corporate firewalls).
 const ICE_SERVERS: RTCIceServer[] = [
+  // Google STUN (most reliable public STUN)
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun3.l.google.com:19302" },
+  { urls: "stun:stun4.l.google.com:19302" },
+  // Cloudflare STUN
+  { urls: "stun:stun.cloudflare.com:3478" },
+  // Open Relay TURN (free, no signup)
   { urls: "stun:openrelay.metered.ca:80" },
   {
     urls: "turn:openrelay.metered.ca:80",
@@ -214,14 +220,22 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      if (state === "disconnected" || state === "failed" || state === "closed") {
+      // "disconnected" is a transient state — ICE may recover on its own.
+      // Only tear down on permanently terminal states.
+      if (state === "failed" || state === "closed") {
         peersRef.current.delete(targetUserId);
         setRemoteStreams((prev) => {
           const next = new Map(prev);
           next.delete(targetUserId);
           return next;
         });
-        if (peersRef.current.size === 0 && state === "failed") {
+        if (peersRef.current.size === 0) {
+          // Dispatch a visible error before cleaning up so the user knows what happened
+          if (state === "failed") {
+            window.dispatchEvent(new CustomEvent("pulse:call-error", {
+              detail: { message: "Не удалось установить соединение. Возможно, проблема с сетью." },
+            }));
+          }
           cleanupCall();
         }
       }
