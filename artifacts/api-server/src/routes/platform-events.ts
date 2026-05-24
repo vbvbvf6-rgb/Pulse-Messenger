@@ -1,8 +1,19 @@
 import { Router } from "express";
 import { db, platformEventsTable } from "@workspace/db";
-import { eq, desc, and, lte, gte, or, isNull } from "drizzle-orm";
+import { eq, desc, and, lte, gte, or, isNull, sql } from "drizzle-orm";
 
 const router = Router();
+
+const ADMIN_USER_IDS = [4];
+
+async function isAdminUser(userId: number): Promise<boolean> {
+  if (ADMIN_USER_IDS.includes(userId)) return true;
+  try {
+    const rows = await db.execute(sql`SELECT is_admin FROM users WHERE id = ${userId}`);
+    const user = rows.rows[0] as any;
+    return !!user?.is_admin;
+  } catch { return false; }
+}
 
 router.get("/platform-events", async (req, res) => {
   try {
@@ -33,7 +44,9 @@ router.get("/platform-events", async (req, res) => {
 
 router.get("/admin/platform-events", async (req, res) => {
   try {
-    if (!(req as any).isAdmin) return res.status(403).json({ error: "Forbidden" });
+    if (!(await isAdminUser(req.currentUserId))) {
+      return res.status(403).json({ error: "Доступ запрещён" });
+    }
     const events = await db
       .select()
       .from(platformEventsTable)
@@ -47,7 +60,9 @@ router.get("/admin/platform-events", async (req, res) => {
 
 router.post("/admin/platform-events", async (req, res) => {
   try {
-    if (!(req as any).isAdmin) return res.status(403).json({ error: "Forbidden" });
+    if (!(await isAdminUser(req.currentUserId))) {
+      return res.status(403).json({ error: "Доступ запрещён" });
+    }
     const { title, description, imageUrl, bannerColor, startAt, endAt, isActive } = req.body;
     if (!title?.trim()) return res.status(400).json({ error: "Заголовок обязателен" });
 
@@ -70,7 +85,9 @@ router.post("/admin/platform-events", async (req, res) => {
 
 router.patch("/admin/platform-events/:id", async (req, res) => {
   try {
-    if (!(req as any).isAdmin) return res.status(403).json({ error: "Forbidden" });
+    if (!(await isAdminUser(req.currentUserId))) {
+      return res.status(403).json({ error: "Доступ запрещён" });
+    }
     const id = Number(req.params.id);
     const { title, description, imageUrl, bannerColor, startAt, endAt, isActive } = req.body;
 
@@ -94,7 +111,9 @@ router.patch("/admin/platform-events/:id", async (req, res) => {
 
 router.delete("/admin/platform-events/:id", async (req, res) => {
   try {
-    if (!(req as any).isAdmin) return res.status(403).json({ error: "Forbidden" });
+    if (!(await isAdminUser(req.currentUserId))) {
+      return res.status(403).json({ error: "Доступ запрещён" });
+    }
     const id = Number(req.params.id);
     await db.delete(platformEventsTable).where(eq(platformEventsTable.id, id));
     res.status(204).send();
