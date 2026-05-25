@@ -24,7 +24,7 @@ export function BottomNav({ onOpenPalette, onOpenSidebar }: BottomNavProps) {
     { href: "/feed",     icon: Rss,           label: "Лента",   badge: 0 },
   ];
 
-  if (selectedChatId) return null;
+  if (selectedChatId && location === "/") return null;
 
   return (
     <nav
