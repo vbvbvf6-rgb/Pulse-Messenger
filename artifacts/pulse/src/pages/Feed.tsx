@@ -194,8 +194,11 @@ function BlockedPostCard({ post, onAppealSubmitted }: { post: any; onAppealSubmi
             <ShieldAlert size={20} className="text-destructive shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-destructive mb-0.5">Пост заблокирован</p>
-              <p className="text-xs text-muted-foreground mb-3">
+              <p className="text-xs text-muted-foreground mb-1">
                 {post.moderationReason || "Контент нарушает правила сообщества"}
+              </p>
+              <p className="text-xs text-muted-foreground/60 mb-3 italic">
+                👁 Только вы видите этот пост — другие пользователи его не видят
               </p>
 
               {!appealStatus && (
@@ -1026,6 +1029,13 @@ export default function Feed() {
   const { data: posts, isLoading, refetch } = useGetPosts({ query: { refetchInterval: 20000 } } as any);
   const { data: me } = useGetMe();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handler = () => queryClient.invalidateQueries({ queryKey: ["/api/posts"] });
+    window.addEventListener("pulse:moderation-removed", handler);
+    return () => window.removeEventListener("pulse:moderation-removed", handler);
+  }, [queryClient]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const currentUserId = getCurrentUserId();
   const { toast } = useToast();

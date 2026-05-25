@@ -214,10 +214,20 @@ export function ActiveCall() {
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
   const [isPipExpanded, setIsPipExpanded] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent).detail?.message as string | undefined;
+      setCallError(msg || "Аудио/видео недоступно");
+    };
+    window.addEventListener("pulse:call-error", handler);
+    return () => window.removeEventListener("pulse:call-error", handler);
+  }, []);
 
   // Ringback tone for outgoing call (caller hears while waiting)
   useEffect(() => {
@@ -358,6 +368,17 @@ export function ActiveCall() {
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex flex-col overflow-hidden"
         >
+          {callError && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute top-16 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-black/80 border border-yellow-500/30 text-yellow-400 text-xs font-medium shadow-lg backdrop-blur-sm"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              {callError}
+              <button onClick={() => setCallError(null)} className="ml-1 opacity-60 hover:opacity-100">✕</button>
+            </motion.div>
+          )}
           {/* ── VIDEO CALL ── */}
           {isVideo ? (
             <>

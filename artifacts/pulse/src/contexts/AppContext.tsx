@@ -229,13 +229,13 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
           next.delete(targetUserId);
           return next;
         });
-        if (peersRef.current.size === 0) {
-          // Dispatch a visible error before cleaning up so the user knows what happened
-          if (state === "failed") {
-            window.dispatchEvent(new CustomEvent("pulse:call-error", {
-              detail: { message: "Не удалось установить соединение. Возможно, проблема с сетью." },
-            }));
-          }
+        if (state === "failed") {
+          // WebRTC failed — notify UI but keep call alive so user can still hang up manually
+          window.dispatchEvent(new CustomEvent("pulse:call-error", {
+            detail: { message: "Прямое соединение недоступно. Аудио/видео могут не работать." },
+          }));
+        } else if (state === "closed" && peersRef.current.size === 0) {
+          // Connection explicitly closed — clean up
           cleanupCall();
         }
       }

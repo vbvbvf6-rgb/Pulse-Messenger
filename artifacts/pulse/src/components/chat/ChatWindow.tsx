@@ -338,6 +338,9 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const [showCreateGroupDialog, setShowCreateGroupDialog] = useState(false);
   const [createGroupName, setCreateGroupName] = useState("");
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryText, setSummaryText] = useState("");
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageCountRef = useRef<number>(0);
   const sseRef = useRef<EventSource | null>(null);
@@ -567,6 +570,35 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  const handleSummarize = async () => {
+    if (!messages || messages.length === 0) return;
+    setSummaryOpen(true);
+    setSummaryText("");
+    setSummaryLoading(true);
+    try {
+      const token = sessionStorage.getItem("pulse-token");
+      const payload = messages.slice(-50).map((m: any) => ({
+        senderName: m.senderName || m.sender?.displayName || "Пользователь",
+        text: m.text || "",
+      }));
+      const resp = await fetch("/api/ai/summarize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ messages: payload }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Ошибка");
+      setSummaryText(data.summary);
+    } catch (err: any) {
+      setSummaryText("Не удалось получить резюме. Попробуйте позже.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   const handleStartCall = async (type: "audio" | "video") => {
     if (!chat?.otherUser?.id || calling) return;
@@ -939,6 +971,12 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
                 <Search size={18} className="mr-3 text-muted-foreground" />
                 <span className="font-semibold">{t("chat.searchMessages")}</span>
               </DropdownMenuItem>
+              {chat.type === "direct" && messages && messages.length > 3 && (
+                <DropdownMenuItem onClick={handleSummarize} className="rounded-xl cursor-pointer py-2.5">
+                  <Sparkles size={18} className="mr-3 text-amber-400" />
+                  <span className="font-semibold">Резюме чата</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleToggleMute} className="rounded-xl cursor-pointer py-2.5">
                 {chat.isMuted ? (
@@ -1583,6 +1621,33 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {summaryOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSummaryOpen(false)}>
+          <div className="relative w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <Sparkles size={20} className="text-amber-400" />
+              </div>
+              <div>
+                <p className="font-bold text-base">Резюме чата</p>
+                <p className="text-xs text-muted-foreground">На основе последних сообщений</p>
+              </div>
+              <button onClick={() => setSummaryOpen(false)} className="ml-auto w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            {summaryLoading ? (
+              <div className="flex items-center gap-3 py-4">
+                <div className="w-4 h-4 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+                <span className="text-sm text-muted-foreground">AI анализирует переписку…</span>
+              </div>
+            ) : (
+              <p className="text-sm text-foreground/90 leading-relaxed">{summaryText}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="max-w-sm rounded-[24px]">
