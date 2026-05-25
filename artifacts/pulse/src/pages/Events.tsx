@@ -263,7 +263,7 @@ export default function Events() {
   const streakDays = 3;
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden">
+    <div className="flex flex-col w-full h-full bg-background overflow-hidden">
       <div className="flex-1 overflow-y-auto scrollbar-none pb-8">
 
         {/* ── Header ── */}
