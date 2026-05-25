@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useMemo } from "react";
-import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, Message } from "@workspace/api-client-react";
+import { useGetChatById, useGetMessages, getGetMessagesQueryKey, useMarkChatAsRead, useUpdateChat, getGetChatsQueryKey, getGetChatByIdQueryKey, Message } from "@workspace/api-client-react";
 import { useP2PChannel } from "@/hooks/useP2PChannel";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useLastSeen } from "@/hooks/useLastSeen";
@@ -591,8 +591,24 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
 
   const handleToggleMute = () => {
     if (!chat) return;
-    updateChat.mutate({ chatId, data: { isMuted: !chat.isMuted } }, {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() })
+    const newMuted = !chat.isMuted;
+    const chatKey = getGetChatByIdQueryKey(chatId);
+    const chatsKey = getGetChatsQueryKey();
+    const prevChat = queryClient.getQueryData(chatKey);
+    const prevChats = queryClient.getQueryData(chatsKey);
+    queryClient.setQueryData(chatKey, (old: any) => old ? { ...old, isMuted: newMuted } : old);
+    queryClient.setQueryData(chatsKey, (old: any) =>
+      Array.isArray(old) ? old.map((c: any) => c.id === chatId ? { ...c, isMuted: newMuted } : c) : old
+    );
+    updateChat.mutate({ chatId, data: { isMuted: newMuted } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: chatsKey });
+        queryClient.invalidateQueries({ queryKey: chatKey });
+      },
+      onError: () => {
+        queryClient.setQueryData(chatKey, prevChat);
+        queryClient.setQueryData(chatsKey, prevChats);
+      },
     });
   };
 
@@ -604,11 +620,24 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
 
   const handleTogglePin = () => {
     if (!chat) return;
+    const newPinned = !chat.isPinned;
+    const chatKey = getGetChatByIdQueryKey(chatId);
+    const chatsKey = getGetChatsQueryKey();
+    const prevChat = queryClient.getQueryData(chatKey);
+    const prevChats = queryClient.getQueryData(chatsKey);
+    queryClient.setQueryData(chatKey, (old: any) => old ? { ...old, isPinned: newPinned } : old);
+    queryClient.setQueryData(chatsKey, (old: any) =>
+      Array.isArray(old) ? old.map((c: any) => c.id === chatId ? { ...c, isPinned: newPinned } : c) : old
+    );
     fetch(`/api/chats/${chatId}/pin`, {
       method: "PUT",
       headers: getCWAuthHeaders(),
     }).then(() => {
-      queryClient.invalidateQueries({ queryKey: getGetChatsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: chatsKey });
+      queryClient.invalidateQueries({ queryKey: chatKey });
+    }).catch(() => {
+      queryClient.setQueryData(chatKey, prevChat);
+      queryClient.setQueryData(chatsKey, prevChats);
     });
   };
 
