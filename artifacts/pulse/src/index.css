@@ -301,7 +301,27 @@
   /* Login page — allow top-anchored scroll instead of broken centered overflow */
   .login-landscape {
     align-items: flex-start !important;
-    padding-top: env(safe-area-inset-top, 1.5rem);
     padding-top: max(1.5rem, env(safe-area-inset-top, 1.5rem));
+  }
+
+  /* Stories bar: shrink in landscape */
+  [class*="stories-bar"] {
+    --stories-height: 60px;
+  }
+}
+
+/* ─── Safe area helpers ──────────────────────────────────────────────────── */
+/* Ensure bottom nav respects home indicator on iOS */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ─── Prevent tiny-screen chat input overflow ───────────────────────────── */
+/* On iPhone SE (375 × 667) with keyboard open, cap textarea at 100px */
+@media (max-height: 500px) {
+  textarea[data-chat-input] {
+    max-height: 80px !important;
   }
 }

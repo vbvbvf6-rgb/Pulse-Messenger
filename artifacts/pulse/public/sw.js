@@ -1,9 +1,12 @@
-const CACHE_NAME = "pulse-v2";
+const CACHE_NAME = "nova-v1";
 const SHELL_URLS = ["/", "/manifest.json", "/favicon.svg", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((c) => c.addAll(SHELL_URLS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then((c) => c.addAll(SHELL_URLS))
+      // Do NOT call skipWaiting() automatically — wait for user confirmation
+      // so we can show an "Update available" banner first
   );
 });
 
@@ -18,8 +21,23 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   const url = new URL(e.request.url);
-  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/bot/")) return;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/bot/") || url.pathname.startsWith("/socket.io")) return;
 
+  // Network-first for HTML navigation requests (ensures fresh app shell)
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request).then((res) => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then((cached) => cached || caches.match("/")))
+    );
+    return;
+  }
+
+  // Stale-while-revalidate for assets
   e.respondWith(
     caches.match(e.request).then((cached) => {
       const network = fetch(e.request).then((res) => {
@@ -32,6 +50,28 @@ self.addEventListener("fetch", (e) => {
       return cached || network;
     })
   );
+});
+
+// Tell all clients a new SW is waiting — they can prompt the user to update
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "skip-waiting") {
+    self.skipWaiting();
+    return;
+  }
+
+  if (e.data?.type === "show-notification") {
+    const { title, body, icon, url, tag } = e.data;
+    self.registration.showNotification(title, {
+      body,
+      icon: icon || "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: url || "/" },
+      vibrate: [100, 50, 100],
+      tag: tag || "nova-message",
+      renotify: true,
+      silent: false,
+    });
+  }
 });
 
 self.addEventListener("notificationclick", (e) => {
@@ -54,30 +94,14 @@ self.addEventListener("push", (e) => {
   if (!e.data) return;
   const data = e.data.json();
   e.waitUntil(
-    self.registration.showNotification(data.title || "Pulse", {
+    self.registration.showNotification(data.title || "Nova", {
       body: data.body || "",
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       data: { url: data.url || "/" },
       vibrate: [100, 50, 100],
-      tag: data.tag || "pulse-message",
+      tag: data.tag || "nova-message",
       renotify: true,
     })
   );
-});
-
-self.addEventListener("message", (e) => {
-  if (e.data?.type === "show-notification") {
-    const { title, body, icon, url, tag } = e.data;
-    self.registration.showNotification(title, {
-      body,
-      icon: icon || "/icon-192.png",
-      badge: "/icon-192.png",
-      data: { url: url || "/" },
-      vibrate: [100, 50, 100],
-      tag: tag || "pulse-message",
-      renotify: true,
-      silent: false,
-    });
-  }
 });

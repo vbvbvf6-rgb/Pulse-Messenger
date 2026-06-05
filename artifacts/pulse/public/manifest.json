@@ -1,14 +1,14 @@
 {
-  "name": "Pulse Messenger",
-  "short_name": "Pulse",
-  "description": "Telegram-inspired messenger with real-time chats, calls, stories and gifts",
+  "name": "Nova Messenger",
+  "short_name": "Nova",
+  "description": "Nova — быстрый и красивый мессенджер с голосовыми и видеозвонками, историями, подарками и ИИ-ассистентом.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "theme_color": "#ff5500",
+  "orientation": "any",
+  "theme_color": "#ff6b35",
   "background_color": "#0d0d0d",
-  "id": "pulse-messenger",
+  "id": "nova-messenger",
   "icons": [
     {
       "src": "/favicon.svg",
@@ -41,7 +41,7 @@
       "sizes": "1200x630",
       "type": "image/jpeg",
       "form_factor": "wide",
-      "label": "Pulse Messenger — Чаты"
+      "label": "Nova Messenger — Чаты"
     }
   ],
   "categories": ["social", "communication"],

@@ -445,8 +445,11 @@ export function ActiveCall() {
               <motion.div
                 drag
                 dragMomentum={false}
-                className="absolute top-16 right-4 z-20 cursor-grab active:cursor-grabbing"
+                dragConstraints={{ top: 0, left: 0, right: 0, bottom: 0 }}
+                dragElastic={0.08}
+                style={{ position: "absolute", top: 64, right: 16, zIndex: 20 }}
                 animate={{ width: isPipExpanded ? 160 : 100, height: isPipExpanded ? 220 : 140 }}
+                className="cursor-grab active:cursor-grabbing"
               >
                 <div className="w-full h-full rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-neutral-800">
                   {localStream && !isVideoOff ? (
@@ -532,7 +535,7 @@ export function ActiveCall() {
 
           {/* ── CONTROL BAR ── */}
           <div className="absolute bottom-0 left-0 right-0 z-30">
-            <div className="mx-auto max-w-sm px-4 pb-10 pt-4 flex flex-col items-center gap-3">
+            <div className="mx-auto max-w-sm px-4 pb-[env(safe-area-inset-bottom,2.5rem)] [.landscape_&]:pb-3 pt-4 flex flex-col items-center gap-2">
               {/* Secondary row: screen share + invite */}
               <div className="flex items-center gap-3">
                 {/* Screen share (video calls only) */}

@@ -1,0 +1,2 @@
+- [App rebranding](rebrand-nova.md) — App renamed from "Pulse"/"Aether" to "Nova"; internal localStorage/sessionStorage keys intentionally keep "pulse-" prefix to avoid logging out existing users.
+- [PWA offline updates](pwa-update-flow.md) — SW no longer auto-calls skipWaiting(); instead waits for user to confirm via toast banner; hook in src/hooks/useServiceWorkerUpdate.ts + PwaUpdateBanner in App.tsx.

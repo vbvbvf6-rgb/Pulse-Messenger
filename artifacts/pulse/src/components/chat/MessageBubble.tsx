@@ -1141,8 +1141,8 @@ export function MessageBubble({ message, onReply, onEdit, ownBubbleStyle, onPin,
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className="fixed z-[999] select-none"
             style={{
-              left: Math.min(menuPos.x, window.innerWidth - 240),
-              top: Math.min(menuPos.y, window.innerHeight - 360),
+              left: Math.max(8, Math.min(menuPos.x, window.innerWidth - 248)),
+              top: Math.max(8, Math.min(menuPos.y, window.innerHeight - 368)),
             }}
             onMouseDown={e => e.stopPropagation()}
           >

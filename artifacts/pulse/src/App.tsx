@@ -13,6 +13,8 @@ import { motion } from "framer-motion";
 import { Clock, LogOut, ShieldCheck } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
+import { useServiceWorkerUpdate } from "@/hooks/useServiceWorkerUpdate";
+import { useToast } from "@/hooks/use-toast";
 
 import Home from "@/pages/Home";
 import Calls from "@/pages/Calls";
@@ -66,7 +68,7 @@ function VerificationPending({ onLogout }: { onLogout: () => void }) {
           </motion.div>
           <h1 className="text-2xl font-black text-foreground mb-2">Аккаунт на проверке</h1>
           <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-            Ваш документ отправлен на проверку администратору. После подтверждения вы получите полный доступ к Aether.
+            Ваш документ отправлен на проверку администратору. После подтверждения вы получите полный доступ к Nova.
           </p>
           <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-6 flex items-center gap-3 text-left">
             <Clock size={18} className="text-primary shrink-0" />
@@ -125,6 +127,31 @@ function GlobalNotificationListener() {
   return null;
 }
 
+function PwaUpdateBanner() {
+  const { updateAvailable, applyUpdate } = useServiceWorkerUpdate();
+  const { toast } = useToast();
+  const shown = useRef(false);
+  useEffect(() => {
+    if (updateAvailable && !shown.current) {
+      shown.current = true;
+      toast({
+        title: "Доступно обновление Nova",
+        description: "Новая версия готова к установке.",
+        duration: 0,
+        action: (
+          <button
+            onClick={applyUpdate}
+            className="shrink-0 rounded-xl bg-primary text-white text-xs font-semibold px-3 py-1.5 hover:bg-primary/90 transition-colors"
+          >
+            Обновить
+          </button>
+        ) as any,
+      });
+    }
+  }, [updateAvailable]);
+  return null;
+}
+
 function MainAppInner({ onLogout, onSwitchAccount, onRemoveAccount, onOpenAddAccount }: MainAppProps) {
   useEffect(() => {
     const checkScheduled = async () => {
@@ -173,6 +200,7 @@ function MainAppInner({ onLogout, onSwitchAccount, onRemoveAccount, onOpenAddAcc
     >
       <TooltipProvider>
         <GlobalNotificationListener />
+        <PwaUpdateBanner />
         <ScreenLock>
           <AppLayout>
             <Switch>

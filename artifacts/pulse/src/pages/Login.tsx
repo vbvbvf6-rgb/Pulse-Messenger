@@ -183,7 +183,7 @@ export default function Login({ onLogin }: LoginProps) {
   const getStepTitle = () => {
     if (step === "2fa") return "Верификация";
     if (step === "qr") return "QR вход";
-    return "Pulse";
+    return "Nova";
   };
 
   const getStepSubtitle = () => {
@@ -643,7 +643,7 @@ export default function Login({ onLogin }: LoginProps) {
         >
           <Shield size={10} style={{ color: "rgba(0,0,0,0.2)" }} />
           <p style={{ fontSize: "11px", color: "rgba(0,0,0,0.2)", fontWeight: 500 }}>
-            Pulse Messenger · Ваши данные надёжно защищены
+            Nova Messenger · Ваши данные надёжно защищены
           </p>
         </motion.div>
       </motion.div>
