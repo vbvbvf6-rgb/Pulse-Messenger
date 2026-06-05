@@ -147,7 +147,7 @@ export default function Admin() {
   const [giveLoading, setGiveLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"balance" | "password" | "actions" | "stats">("balance");
+  const [activeTab, setActiveTab] = useState<"balance" | "password" | "actions" | "stats" | "gifts">("balance");
   const [newPassword, setNewPassword] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<AdminUser | null>(null);

@@ -32,7 +32,9 @@ router.post("/calls", async (req, res) => {
     const uid = req.currentUserId;
     const body = InitiateCallBody.parse(req.body);
 
-    const callee = await db.query.usersTable.findFirst({ where: eq(usersTable.id, body.calleeId) });
+    const callee = body.calleeId != null
+      ? await db.query.usersTable.findFirst({ where: eq(usersTable.id, body.calleeId) })
+      : undefined;
 
     const [call] = await db.insert(callsTable).values({
       callerId: uid,

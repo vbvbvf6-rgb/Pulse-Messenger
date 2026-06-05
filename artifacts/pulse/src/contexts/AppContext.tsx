@@ -6,7 +6,7 @@ import { getSavedAccounts, SavedAccount, MAX_ACCOUNTS } from "@/lib/accounts";
 // STUN servers for NAT traversal (multiple providers for reliability).
 // TURN relay servers are used when direct/STUN connections are blocked (symmetric NAT, corporate firewalls).
 const ICE_SERVERS: RTCIceServer[] = [
-  // Google STUN (most reliable public STUN)
+  // Google STUN — globally distributed, most reliable
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
@@ -14,7 +14,9 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun4.l.google.com:19302" },
   // Cloudflare STUN
   { urls: "stun:stun.cloudflare.com:3478" },
-  // Open Relay TURN (free, no signup)
+  // Twilio STUN
+  { urls: "stun:global.stun.twilio.com:3478" },
+  // Open Relay TURN (free) — UDP + TCP + TLS for maximum firewall traversal
   { urls: "stun:openrelay.metered.ca:80" },
   {
     urls: "turn:openrelay.metered.ca:80",
@@ -35,6 +37,12 @@ const ICE_SERVERS: RTCIceServer[] = [
     urls: "turns:openrelay.metered.ca:443?transport=tcp",
     username: "openrelayproject",
     credential: "openrelayproject",
+  },
+  // Numb TURN — additional free relay for fallback
+  {
+    urls: "turn:numb.viagenie.ca",
+    username: "webrtc@live.com",
+    credential: "muazkh",
   },
 ];
 
@@ -196,7 +204,15 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
 
   // ── peer factory ──────────────────────────────────────────────────────────
   const createPeer = useCallback((targetUserId: number, roomId: number): RTCPeerConnection => {
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({
+      iceServers: ICE_SERVERS,
+      // bundle all media into one transport — reduces ICE candidates & ports needed
+      bundlePolicy: "max-bundle",
+      // use a single RTCP mux — simpler traversal through firewalls
+      rtcpMuxPolicy: "require",
+      // allow both relay (TURN) and direct (host/srflx) — required for international calls
+      iceTransportPolicy: "all",
+    });
 
     pc.onicecandidate = (e) => {
       if (e.candidate && socketRef.current) {
@@ -244,6 +260,19 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
     return pc;
   }, [cleanupCall]);
 
+  // ── helpers ───────────────────────────────────────────────────────────────
+  // Flush any ICE candidates buffered while waiting for remote description.
+  const flushPendingIce = useCallback(async (pc: RTCPeerConnection, fromUserId: number) => {
+    const buffered = pendingSignalsRef.current.get(fromUserId) ?? [];
+    if (buffered.length === 0) return;
+    pendingSignalsRef.current.delete(fromUserId);
+    for (const s of buffered) {
+      if (s.type === "ice" && s.candidate) {
+        await pc.addIceCandidate(new RTCIceCandidate(s.candidate)).catch(() => {});
+      }
+    }
+  }, []);
+
   // ── signal handler ────────────────────────────────────────────────────────
   const applySignal = useCallback(async (
     fromUserId: number,
@@ -268,6 +297,8 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
       if (signal.type === "offer") {
         if (pc.signalingState !== "stable") return;
         await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: signal.sdp }));
+        // Flush ICE candidates that arrived before the remote description was ready
+        await flushPendingIce(pc, fromUserId);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         socketRef.current?.emit("webrtc-signal", {
@@ -278,13 +309,15 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
       } else if (signal.type === "answer") {
         if (pc.signalingState === "have-local-offer") {
           await pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: signal.sdp }));
+          // Flush ICE candidates that arrived before the remote description was ready
+          await flushPendingIce(pc, fromUserId);
         }
       } else if (signal.type === "ice" && signal.candidate) {
         if (pc.remoteDescription) {
-          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate)).catch(() => {});
         } else {
           // Queue ICE for after remote description is set
-          const arr = pendingSignalsRef.current.get(fromUserId) || [];
+          const arr = pendingSignalsRef.current.get(fromUserId) ?? [];
           arr.push(signal);
           pendingSignalsRef.current.set(fromUserId, arr);
         }
@@ -292,7 +325,7 @@ export function AppProvider({ children, onLogout, onSwitchAccount, onRemoveAccou
     } catch (err) {
       console.warn("applySignal error:", err);
     }
-  }, [createPeer]);
+  }, [createPeer, flushPendingIce]);
 
   // ── setup socket listeners for an active call ────────────────────────────
   const setupCallSocket = useCallback((sock: Socket, roomId: number) => {
