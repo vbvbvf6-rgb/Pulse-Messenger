@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Zap, Copy, Check, Trophy, Star, MessageSquare, Phone, Gift,
+  Zap, Copy, Check, Trophy, Star, MessageSquare, Phone,
   History, Shield, ChevronRight, ArrowUpRight, ArrowDownLeft,
   AlertTriangle, CheckCircle2, TrendingUp, X, Send, ShoppingCart, Crown
 } from "lucide-react";
@@ -12,7 +12,6 @@ const TASK_CONFIGS: Record<string, { color: string; icon: React.ReactNode }> = {
   daily_login:    { color: "from-yellow-500 to-amber-500",   icon: <Zap size={20} className="text-white" /> },
   send_message:   { color: "from-blue-500 to-cyan-500",      icon: <MessageSquare size={20} className="text-white" /> },
   make_call:      { color: "from-green-500 to-emerald-500",  icon: <Phone size={20} className="text-white" /> },
-  send_gift:      { color: "from-pink-500 to-rose-500",      icon: <Gift size={20} className="text-white" /> },
   add_contact:    { color: "from-purple-500 to-violet-500",  icon: <Star size={20} className="text-white" /> },
   update_profile: { color: "from-orange-500 to-amber-500",   icon: <Trophy size={20} className="text-white" /> },
 };
@@ -21,7 +20,6 @@ const BASE_TASKS = [
   { id: "daily_login",    title: "Ежедневный вход",    description: "Открой Nova сегодня",        reward: 5  },
   { id: "send_message",   title: "Отправь сообщение",  description: "Напиши кому-нибудь",           reward: 10 },
   { id: "make_call",      title: "Позвони другу",       description: "Соверши звонок",               reward: 15 },
-  { id: "send_gift",      title: "Отправь подарок",     description: "Порадуй кого-нибудь",          reward: 20 },
   { id: "add_contact",    title: "Добавь контакт",      description: "Расширь сеть",                 reward: 10 },
   { id: "update_profile", title: "Обнови профиль",      description: "Добавь биографию или статус",  reward: 15 },
 ];
@@ -59,14 +57,6 @@ async function verifyTask(taskId: string): Promise<{ ok: boolean; reason?: strin
         return (data.callsMade || 0) > 0
           ? { ok: true }
           : { ok: false, reason: "Сначала позвони кому-нибудь" };
-      }
-      case "send_gift": {
-        const res = await fetch("/api/gifts/sent", { headers });
-        if (!res.ok) return { ok: false, reason: "Не удалось проверить" };
-        const data = await res.json();
-        return Array.isArray(data) && data.length > 0
-          ? { ok: true }
-          : { ok: false, reason: "Сначала отправь подарок кому-нибудь" };
       }
       case "add_contact": {
         const res = await fetch("/api/contacts", { headers });

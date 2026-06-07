@@ -219,16 +219,6 @@ export default function Events() {
       color: "from-rose-500 to-pink-600",
     },
     {
-      id: "q4", type: "daily",
-      icon: <Send size={18} />,
-      title: "Отправить подарок",
-      desc: "Порадуй кого-нибудь из контактов",
-      reward: 51, rewardIcon: "⚡",
-      progress: progress["q4"] ?? 0, total: 1,
-      completed: completed.has("q4"),
-      color: "from-amber-500 to-orange-600",
-    },
-    {
       id: "q5", type: "weekly",
       icon: <UserPlus size={18} />,
       title: "Добавить 3 контакта",

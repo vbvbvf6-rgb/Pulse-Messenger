@@ -1332,6 +1332,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scrollbar-none chat-bg"
+        style={{ touchAction: "pan-y", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
       >
         {isMessagesLoading ? (
           <div className="space-y-6 max-w-2xl mx-auto w-full">

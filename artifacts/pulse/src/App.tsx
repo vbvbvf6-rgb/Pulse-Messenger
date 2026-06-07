@@ -409,7 +409,7 @@ function App() {
   return (
     <div style={{
       zoom: `${zoom}%`,
-      height: `${(100 / (zoom / 100)).toFixed(4)}dvh`,
+      height: zoom === 100 ? "var(--app-h, 100dvh)" : `${(100 / (zoom / 100)).toFixed(4)}dvh`,
       width: `${(100 / (zoom / 100)).toFixed(4)}%`,
       overflow: "hidden",
     }}>

@@ -173,6 +173,7 @@ export default function Home() {
               transform: `translateX(${overlayX}px)`,
               transition: isAnimating ? "transform 0.22s cubic-bezier(0.32,0,0.67,0)" : "none",
               willChange: "transform",
+              touchAction: "pan-y",
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}

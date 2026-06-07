@@ -3,7 +3,7 @@ import { useGetMyStats, useGetMe } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageSquare, Phone, Gift, Users, Clock, CalendarDays, Settings, BadgeCheck, Crown, Zap, QrCode, Sparkles, Activity, TrendingUp, Star, Share2, Copy, ExternalLink } from "lucide-react";
+import { MessageSquare, Phone, Users, Clock, CalendarDays, Settings, BadgeCheck, Crown, Zap, QrCode, Sparkles, Activity, TrendingUp, Star, Share2, Copy, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -680,18 +680,6 @@ export default function Profile() {
                     label="Звонков"
                     value={stats?.callsMade?.toLocaleString() || "0"}
                     color="bg-green-500/10 border-green-500/20"
-                  />
-                  <StatCard
-                    icon={<Gift className="text-purple-500" />}
-                    label="Подарков"
-                    value={stats?.giftsSent?.toLocaleString() || "0"}
-                    color="bg-purple-500/10 border-purple-500/20"
-                  />
-                  <StatCard
-                    icon={<Gift className="text-pink-500" />}
-                    label="Получено"
-                    value={stats?.giftsReceived?.toLocaleString() || "0"}
-                    color="bg-pink-500/10 border-pink-500/20"
                   />
                   <StatCard
                     icon={<Users className="text-primary" />}

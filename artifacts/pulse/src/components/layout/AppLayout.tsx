@@ -42,8 +42,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="flex h-[100dvh] w-full overflow-hidden bg-background text-foreground relative"
+      className="flex w-full overflow-hidden bg-background text-foreground relative"
       style={{
+        height: "var(--app-h, 100dvh)",
         paddingLeft: "env(safe-area-inset-left, 0px)",
         paddingRight: "env(safe-area-inset-right, 0px)",
       }}

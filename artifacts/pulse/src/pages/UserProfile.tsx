@@ -5,20 +5,16 @@ import {
   useGetUserById,
   useGetContacts,
   useGetChats,
-  useGetSentGifts,
-  useGetReceivedGifts,
   useAddContact,
   useRemoveContact,
   getGetContactsQueryKey,
   getGetChatsQueryKey,
 } from "@workspace/api-client-react";
-import { GiftLeaderboard } from "@/components/GiftLeaderboard";
 import {
   ArrowLeft,
   MessageSquare,
   Phone,
   Video,
-  Gift,
   UserPlus,
   UserMinus,
   MoreVertical,
@@ -365,9 +361,6 @@ export default function UserProfile() {
   const { data: user, isLoading } = useGetUserById(userId, { query: { enabled: !!userId } as any });
   const { data: contacts } = useGetContacts();
   const { data: chats } = useGetChats();
-  const { data: sentGifts } = useGetSentGifts();
-  const { data: receivedGifts } = useGetReceivedGifts();
-
   const addContact = useAddContact();
   const removeContact = useRemoveContact();
 
@@ -378,9 +371,6 @@ export default function UserProfile() {
     if (chat.type === "direct") return chat.otherUser?.id === userId;
     return chat.members?.some((m: { userId: number }) => m.userId === userId);
   }) ?? [];
-
-  const giftsToUser = sentGifts?.filter((g) => g.receiverId === userId) ?? [];
-  const giftsFromUser = receivedGifts?.filter((g) => g.senderId === userId) ?? [];
 
   const handleAddContact = () => {
     addContact.mutate(
@@ -700,7 +690,7 @@ export default function UserProfile() {
             )}
           </motion.div>
 
-          {!isMe && (commonChats.length > 0 || giftsToUser.length > 0 || giftsFromUser.length > 0) && (
+          {!isMe && commonChats.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -709,9 +699,7 @@ export default function UserProfile() {
             >
               <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-3 px-1">С вами</h3>
               <div className="flex gap-3">
-                {commonChats.length > 0 && <StatCard value={commonChats.length} label="Общих чатов" icon={<MessageSquare size={18} />} />}
-                {giftsToUser.length > 0 && <StatCard value={giftsToUser.length} label="Подарков отдано" icon={<Gift size={18} />} />}
-                {giftsFromUser.length > 0 && <StatCard value={giftsFromUser.length} label="Подарков получено" icon={<Gift size={18} />} />}
+                <StatCard value={commonChats.length} label="Общих чатов" icon={<MessageSquare size={18} />} />
               </div>
             </motion.div>
           )}
@@ -752,32 +740,6 @@ export default function UserProfile() {
             </motion.div>
           )}
 
-          {!isMe && (giftsToUser.length > 0 || giftsFromUser.length > 0) && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="rounded-3xl bg-card border border-border overflow-hidden"
-            >
-              <div className="px-5 pt-4 pb-2">
-                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground">Обмен подарками</h3>
-              </div>
-              <div className="px-4 pb-4 flex flex-wrap gap-2">
-                {[...giftsToUser, ...giftsFromUser].slice(0, 12).map((gift) => (
-                  <motion.div
-                    key={gift.id}
-                    whileHover={{ scale: 1.15 }}
-                    title={gift.giftItem?.name}
-                    className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-2xl cursor-default"
-                  >
-                    {gift.giftItem?.emoji}
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-
-          <GiftLeaderboard userId={userId} />
 
         </div>
       </div>
