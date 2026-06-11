@@ -1,14 +1,17 @@
 import { Router } from "express";
 import { db, usersTable, messagesTable, chatsTable, chatMembersTable, giftsTable, callsTable, banwordsTable } from "@workspace/db";
 import { eq, sql, ne } from "drizzle-orm";
-import { createHash } from "node:crypto";
+import bcrypt from "bcryptjs";
 import { moderateContent, localModerationCheck } from "../lib/moderation";
 import { invalidateBanwordsCache, getBanwords, findBanword } from "../lib/banwords";
 
 const router = Router();
 
 const ADMIN_USER_IDS = [4];
-const hash = (pass: string) => createHash("sha256").update(pass).digest("hex");
+
+// Run once at module load to ensure required columns exist
+db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {});
+db.execute(sql`ALTER TABLE posts ADD COLUMN IF NOT EXISTS moderation_scanned_at TIMESTAMP WITH TIME ZONE`).catch(() => {});
 
 async function isAdminUser(userId: number): Promise<boolean> {
   if (ADMIN_USER_IDS.includes(userId)) return true;
@@ -40,8 +43,11 @@ router.get("/admin/users", requireAdmin, async (req, res) => {
 router.post("/admin/give-currency", requireAdmin, async (req, res) => {
   try {
     const { userId, amount } = req.body;
-    if (!userId || typeof amount !== "number") {
-      return res.status(400).json({ error: "Укажите userId и amount" });
+    if (!userId || typeof amount !== "number" || amount === 0) {
+      return res.status(400).json({ error: "Укажите userId и amount (не равный нулю)" });
+    }
+    if (!Number.isInteger(amount) || amount < -1000000 || amount > 1000000) {
+      return res.status(400).json({ error: "Сумма должна быть целым числом от -1 000 000 до 1 000 000" });
     }
     const target = await db.query.usersTable.findFirst({ where: eq(usersTable.id, Number(userId)) });
     if (!target) return res.status(404).json({ error: "Пользователь не найден" });
@@ -82,7 +88,9 @@ router.post("/admin/reset-password", requireAdmin, async (req, res) => {
     const target = await db.query.usersTable.findFirst({ where: eq(usersTable.id, Number(userId)) });
     if (!target) return res.status(404).json({ error: "Пользователь не найден" });
 
-    await db.execute(sql`UPDATE users SET password_hash = ${hash(String(newPassword))} WHERE id = ${Number(userId)}`);
+    const SALT_ROUNDS = 12;
+    const newHash = await bcrypt.hash(String(newPassword), SALT_ROUNDS);
+    await db.execute(sql`UPDATE users SET password_hash = ${newHash} WHERE id = ${Number(userId)}`);
     res.json({ success: true, message: `Пароль пользователя @${target.username} сброшен` });
   } catch (err) {
     req.log.error(err);
@@ -99,30 +107,37 @@ router.delete("/admin/users/:userId", requireAdmin, async (req, res) => {
     const target = await db.query.usersTable.findFirst({ where: eq(usersTable.id, targetId) });
     if (!target) return res.status(404).json({ error: "Пользователь не найден" });
 
-    // Delete in FK-safe order: leaf tables first, then parent tables
-    await db.execute(sql`DELETE FROM reactions WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM poll_votes WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM spark_activity WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM pinned_messages WHERE pinned_by = ${targetId}`);
-    await db.execute(sql`DELETE FROM push_subscriptions WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM bug_reports WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM scheduled_messages WHERE sender_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM contacts WHERE user_id = ${targetId} OR contact_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM story_views WHERE viewer_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE user_id = ${targetId})`);
-    await db.execute(sql`DELETE FROM stories WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM chat_members WHERE user_id = ${targetId}`);
-    await db.execute(sql`UPDATE messages SET sender_id = NULL WHERE sender_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM gifts WHERE sender_id = ${targetId} OR receiver_id = ${targetId}`);
-    await db.execute(sql`UPDATE calls SET caller_id = NULL WHERE caller_id = ${targetId}`);
-    await db.execute(sql`UPDATE calls SET callee_id = NULL WHERE callee_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM post_likes WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM post_comments WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM moderation_appeals WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM posts WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM support_messages WHERE ticket_id IN (SELECT id FROM support_tickets WHERE user_id = ${targetId})`);
-    await db.execute(sql`DELETE FROM support_tickets WHERE user_id = ${targetId}`);
-    await db.execute(sql`DELETE FROM users WHERE id = ${targetId}`);
+    // Delete in FK-safe order inside a transaction to prevent partial deletions
+    await db.execute(sql`BEGIN`);
+    try {
+      await db.execute(sql`DELETE FROM reactions WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM poll_votes WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM spark_activity WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM pinned_messages WHERE pinned_by = ${targetId}`);
+      await db.execute(sql`DELETE FROM push_subscriptions WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM bug_reports WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM scheduled_messages WHERE sender_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM contacts WHERE user_id = ${targetId} OR contact_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM story_views WHERE viewer_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM story_views WHERE story_id IN (SELECT id FROM stories WHERE user_id = ${targetId})`);
+      await db.execute(sql`DELETE FROM stories WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM chat_members WHERE user_id = ${targetId}`);
+      await db.execute(sql`UPDATE messages SET sender_id = NULL WHERE sender_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM gifts WHERE sender_id = ${targetId} OR receiver_id = ${targetId}`);
+      await db.execute(sql`UPDATE calls SET caller_id = NULL WHERE caller_id = ${targetId}`);
+      await db.execute(sql`UPDATE calls SET callee_id = NULL WHERE callee_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM post_likes WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM post_comments WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM moderation_appeals WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM posts WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM support_messages WHERE ticket_id IN (SELECT id FROM support_tickets WHERE user_id = ${targetId})`);
+      await db.execute(sql`DELETE FROM support_tickets WHERE user_id = ${targetId}`);
+      await db.execute(sql`DELETE FROM users WHERE id = ${targetId}`);
+      await db.execute(sql`COMMIT`);
+    } catch (txErr) {
+      await db.execute(sql`ROLLBACK`);
+      throw txErr;
+    }
 
     res.json({ success: true, message: `Пользователь @${target.username} удалён` });
   } catch (err) {
@@ -188,7 +203,10 @@ router.post("/admin/mass-give", requireAdmin, async (req, res) => {
   try {
     const { amount } = req.body;
     if (typeof amount !== "number" || amount === 0) {
-      return res.status(400).json({ error: "Укажите amount" });
+      return res.status(400).json({ error: "Укажите amount (не равный нулю)" });
+    }
+    if (!Number.isInteger(amount) || Math.abs(amount) > 1000000) {
+      return res.status(400).json({ error: "Сумма должна быть целым числом до ±1 000 000" });
     }
     await db.execute(sql`UPDATE users SET balance = GREATEST(0, balance + ${amount})`);
     const totals = await db.execute(sql`SELECT COUNT(*) as cnt, SUM(balance) as total FROM users`);
@@ -345,8 +363,6 @@ router.get("/admin/leaderboard", requireAdmin, async (req, res) => {
 // Ban / Unban
 router.post("/admin/users/:userId/ban", requireAdmin, async (req, res) => {
   try {
-    // Add is_banned column if not exists
-    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE`);
     const targetId = Number(req.params.userId);
     if (targetId === req.currentUserId) return res.status(400).json({ error: "Нельзя забанить себя" });
     const { ban } = req.body;
@@ -852,8 +868,6 @@ router.get("/admin/moderation/scan-status", requireAdmin, async (req, res) => {
         status TEXT NOT NULL DEFAULT 'running'
       )
     `);
-    await db.execute(sql`ALTER TABLE posts ADD COLUMN IF NOT EXISTS moderation_scanned_at TIMESTAMP WITH TIME ZONE`);
-
     const [runRows, unreviewedRows, totalFlaggedRows] = await Promise.all([
       db.execute(sql`SELECT * FROM moderation_scan_runs ORDER BY started_at DESC LIMIT 10`),
       db.execute(sql`SELECT COUNT(*) as cnt FROM posts WHERE moderation_scanned_at IS NULL AND moderation_status IS NULL`),
@@ -900,8 +914,6 @@ export async function runWeeklyScan(runId: number, triggeredBy: string = "schedu
   let scanned = 0;
   let flagged = 0;
   try {
-    await db.execute(sql`ALTER TABLE posts ADD COLUMN IF NOT EXISTS moderation_scanned_at TIMESTAMP WITH TIME ZONE`);
-
     const unreviewed = await db.execute(sql`
       SELECT id, text FROM posts
       WHERE moderation_scanned_at IS NULL AND moderation_status IS NULL AND text IS NOT NULL AND LENGTH(TRIM(text)) >= 5

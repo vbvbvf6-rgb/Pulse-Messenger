@@ -82,7 +82,10 @@ async function buildChat(chatId: number, currentUserId: number) {
 
   let lastMessage = null;
   if (lastMessageRow) {
-    const sender = await db.query.usersTable.findFirst({ where: eq(usersTable.id, lastMessageRow.senderId) });
+    // senderId can be null (deleted user) — guard against passing null to eq()
+    const sender = lastMessageRow.senderId
+      ? await db.query.usersTable.findFirst({ where: eq(usersTable.id, lastMessageRow.senderId) })
+      : null;
     const reactions = await db.select().from(reactionsTable).where(eq(reactionsTable.messageId, lastMessageRow.id));
     // Compute isRead / isDelivered for the lastMessage (from perspective of currentUserId)
     const otherMembers2 = await db.select({
@@ -378,6 +381,14 @@ router.get("/chats/:chatId/members", async (req, res) => {
 router.post("/chats/:chatId/members", async (req, res) => {
   try {
     const chatId = Number(req.params.chatId);
+    const uid = req.currentUserId;
+    // Only chat owner or admin can add members
+    const myMember = await db.query.chatMembersTable.findFirst({
+      where: and(eq(chatMembersTable.chatId, chatId), eq(chatMembersTable.userId, uid)),
+    });
+    if (!myMember || (myMember.role !== "owner" && myMember.role !== "admin")) {
+      return res.status(403).json({ error: "Only chat owners or admins can add members" });
+    }
     const body = AddChatMemberBody.parse(req.body);
     const [member] = await db.insert(chatMembersTable).values({
       chatId,
@@ -419,6 +430,16 @@ router.delete("/chats/:chatId/members/:memberId", async (req, res) => {
   try {
     const chatId = Number(req.params.chatId);
     const memberId = Number(req.params.memberId);
+    const uid = req.currentUserId;
+    // Allow: removing yourself (leave chat), or owner/admin removing someone else
+    if (uid !== memberId) {
+      const myMember = await db.query.chatMembersTable.findFirst({
+        where: and(eq(chatMembersTable.chatId, chatId), eq(chatMembersTable.userId, uid)),
+      });
+      if (!myMember || (myMember.role !== "owner" && myMember.role !== "admin")) {
+        return res.status(403).json({ error: "Only chat owners or admins can remove members" });
+      }
+    }
     await db.delete(chatMembersTable).where(
       and(eq(chatMembersTable.chatId, chatId), eq(chatMembersTable.userId, memberId))
     );

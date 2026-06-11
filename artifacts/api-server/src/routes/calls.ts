@@ -68,8 +68,13 @@ router.post("/calls", async (req, res) => {
 router.get("/calls/:callId", async (req, res) => {
   try {
     const callId = Number(req.params.callId);
+    const uid = req.currentUserId;
     const call = await db.query.callsTable.findFirst({ where: eq(callsTable.id, callId) });
     if (!call) return res.status(404).json({ error: "Call not found" });
+    // Only the caller or callee may fetch call details
+    if (call.callerId !== uid && call.calleeId !== uid) {
+      return res.status(403).json({ error: "Доступ запрещён" });
+    }
     const built = await buildCall(call);
     res.json(built);
   } catch (err) {
@@ -123,6 +128,11 @@ router.post("/calls/:callId/signal", async (req, res) => {
 
     const call = await db.query.callsTable.findFirst({ where: eq(callsTable.id, callId) });
     if (!call) return res.status(404).json({ error: "Call not found" });
+
+    // Ensure the sender is actually a participant in this call
+    if (call.callerId !== uid && call.calleeId !== uid) {
+      return res.status(403).json({ error: "Доступ запрещён" });
+    }
 
     const targetId = call.callerId === uid ? call.calleeId : call.callerId;
     if (targetId) {

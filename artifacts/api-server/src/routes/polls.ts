@@ -102,6 +102,7 @@ router.post("/polls/:pollId/vote", async (req, res) => {
     const pollRows = await db.execute(sql`SELECT * FROM polls WHERE id = ${pollId} LIMIT 1`);
     const poll = pollRows.rows[0] as any;
     if (!poll) return res.status(404).json({ error: "Опрос не найден" });
+    if (poll.is_closed) return res.status(400).json({ error: "Голосование закрыто" });
 
     if (!(await isChatMember(poll.chat_id, uid))) {
       return res.status(403).json({ error: "Нет доступа" });

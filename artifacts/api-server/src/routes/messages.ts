@@ -115,7 +115,8 @@ async function buildMessagesBatch(msgs: (typeof messagesTable.$inferSelect)[], v
   if (msgs.length === 0) return [];
 
   const msgIds = msgs.map(m => m.id);
-  const senderIds = [...new Set(msgs.map(m => m.senderId))];
+  // Filter out null senderIds (messages from deleted users) to avoid SQL inArray(null) crash
+  const senderIds = [...new Set(msgs.map(m => m.senderId).filter((id): id is number => id !== null && id !== undefined))];
   const replyToIds = [...new Set(msgs.map(m => m.replyToId).filter(Boolean) as number[])];
 
   // 1. Fetch all unique senders in one query
@@ -142,7 +143,8 @@ async function buildMessagesBatch(msgs: (typeof messagesTable.$inferSelect)[], v
   const replyMessages = replyToIds.length
     ? await db.select().from(messagesTable).where(inArray(messagesTable.id, replyToIds))
     : [];
-  const replySenderIds = [...new Set(replyMessages.map(r => r.senderId))];
+  // Filter out null senderIds from reply messages too
+  const replySenderIds = [...new Set(replyMessages.map(r => r.senderId).filter((id): id is number => id !== null && id !== undefined))];
   const replyUsers = replySenderIds.length
     ? await db.select().from(usersTable).where(inArray(usersTable.id, replySenderIds))
     : [];

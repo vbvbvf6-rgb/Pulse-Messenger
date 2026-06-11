@@ -42,15 +42,19 @@ router.post("/wallet/spend", async (req, res) => {
     if (typeof amount !== "number" || amount <= 0) {
       return res.status(400).json({ error: "Некорректная сумма" });
     }
-    const rows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const balance = Number((rows.rows[0] as any)?.balance ?? 0);
-    if (balance < amount) {
+    // Atomic deduct — only succeeds if balance >= amount, prevents race conditions
+    const result = await db.execute(sql`
+      UPDATE users SET balance = balance - ${amount}
+      WHERE id = ${uid} AND balance >= ${amount}
+      RETURNING balance
+    `);
+    if ((result.rows as any[]).length === 0) {
+      const balanceRows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
+      const balance = Number((balanceRows.rows[0] as any)?.balance ?? 0);
       return res.status(400).json({ error: `Недостаточно Spark. Ваш баланс: ${balance} ⚡`, balance });
     }
-    await db.execute(sql`UPDATE users SET balance = balance - ${amount} WHERE id = ${uid}`);
-    await db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${uid}, 'spent', ${-amount}, 'Покупка') ON CONFLICT DO NOTHING`).catch(() => {});
-    const updated = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const newBalance = Number((updated.rows[0] as any)?.balance ?? 0);
+    const newBalance = Number((result.rows[0] as any)?.balance ?? 0);
+    db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${uid}, 'spent', ${-amount}, 'Покупка') ON CONFLICT DO NOTHING`).catch(() => {});
     res.json({ success: true, balance: newBalance });
   } catch (err) {
     req.log.error(err);
@@ -82,21 +86,35 @@ router.post("/wallet/send", async (req, res) => {
       return res.status(404).json({ error: "Пользователь с таким адресом не найден" });
     }
 
-    const senderRows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const senderBalance = Number((senderRows.rows[0] as any)?.balance ?? 0);
-    if (senderBalance < amount) {
+    // Use a single atomic SQL statement to deduct from sender and credit receiver,
+    // and verify sender has sufficient balance — prevents race conditions.
+    const result = await db.execute(sql`
+      WITH deducted AS (
+        UPDATE users SET balance = balance - ${amount}
+        WHERE id = ${uid} AND balance >= ${amount}
+        RETURNING balance
+      ), credited AS (
+        UPDATE users SET balance = balance + ${amount}
+        WHERE id = ${targetId} AND EXISTS (SELECT 1 FROM deducted)
+        RETURNING balance
+      )
+      SELECT (SELECT balance FROM deducted) AS new_sender_balance,
+             (SELECT COUNT(*) FROM deducted) AS deduct_count
+    `);
+
+    const row = result.rows[0] as any;
+    if (!row || Number(row.deduct_count) === 0) {
+      // Re-fetch actual balance for accurate error message
+      const senderRows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
+      const senderBalance = Number((senderRows.rows[0] as any)?.balance ?? 0);
       return res.status(400).json({ error: `Недостаточно Spark. Ваш баланс: ${senderBalance}` });
     }
 
-    await db.execute(sql`UPDATE users SET balance = balance - ${amount} WHERE id = ${uid}`);
-    await db.execute(sql`UPDATE users SET balance = balance + ${amount} WHERE id = ${targetId}`);
+    const newBalance = Number(row.new_sender_balance ?? 0);
 
-    // Log activity
-    await db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${uid}, 'sent', ${-amount}, ${'Отправлено: ' + target.displayName})`).catch(() => {});
-    await db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${targetId}, 'received', ${amount}, ${'Получено от пользователя'})`).catch(() => {});
-
-    const updatedRows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const newBalance = Number((updatedRows.rows[0] as any)?.balance ?? 0);
+    // Log activity (best-effort, non-blocking)
+    db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${uid}, 'sent', ${-amount}, ${'Отправлено: ' + target.displayName})`).catch(() => {});
+    db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${targetId}, 'received', ${amount}, ${'Получено от пользователя'})`).catch(() => {});
 
     res.json({ success: true, balance: newBalance, recipient: target.displayName, amount });
   } catch (err) {
@@ -369,24 +387,35 @@ router.post("/wallet/beg/:id/fulfill", async (req, res) => {
     }
     const beg = begRows.rows[0] as any;
 
-    const senderRows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    const senderBalance = Number((senderRows.rows[0] as any)?.balance ?? 0);
-    if (senderBalance < amount) {
-      return res.status(400).json({ error: `Недостаточно Spark. Ваш баланс: ${senderBalance} ⚡` });
+    // Atomically deduct, credit and mark fulfilled in one transaction block
+    await db.execute(sql`BEGIN`);
+    try {
+      const deductResult = await db.execute(sql`
+        UPDATE users SET balance = balance - ${amount}
+        WHERE id = ${uid} AND balance >= ${amount}
+        RETURNING balance
+      `);
+      if ((deductResult.rows as any[]).length === 0) {
+        await db.execute(sql`ROLLBACK`);
+        const senderRows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
+        const senderBalance = Number((senderRows.rows[0] as any)?.balance ?? 0);
+        return res.status(400).json({ error: `Недостаточно Spark. Ваш баланс: ${senderBalance} ⚡` });
+      }
+      const newBalance = Number((deductResult.rows[0] as any)?.balance ?? 0);
+      await db.execute(sql`UPDATE users SET balance = balance + ${amount} WHERE id = ${beg.from_user_id}`);
+      await db.execute(sql`UPDATE spark_beg_requests SET status = 'fulfilled' WHERE id = ${begId}`);
+      await db.execute(sql`COMMIT`);
+
+      const fromUser = await db.execute(sql`SELECT display_name FROM users WHERE id = ${beg.from_user_id}`);
+      const fromName = (fromUser.rows[0] as any)?.display_name ?? "пользователь";
+      db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${uid}, 'sent', ${-amount}, ${"Отправлено по запросу: " + fromName})`).catch(() => {});
+      db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${beg.from_user_id}, 'received', ${amount}, ${"Получено по запросу ⚡"})`).catch(() => {});
+
+      res.json({ success: true, balance: newBalance });
+    } catch (txErr) {
+      await db.execute(sql`ROLLBACK`);
+      throw txErr;
     }
-
-    await db.execute(sql`UPDATE users SET balance = balance - ${amount} WHERE id = ${uid}`);
-    await db.execute(sql`UPDATE users SET balance = balance + ${amount} WHERE id = ${beg.from_user_id}`);
-    await db.execute(sql`UPDATE spark_beg_requests SET status = 'fulfilled' WHERE id = ${begId}`);
-
-    const fromUser = await db.execute(sql`SELECT display_name FROM users WHERE id = ${beg.from_user_id}`);
-    const fromName = (fromUser.rows[0] as any)?.display_name ?? "пользователь";
-
-    await db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${uid}, 'sent', ${-amount}, ${"Отправлено по запросу: " + fromName})`).catch(() => {});
-    await db.execute(sql`INSERT INTO spark_activity (user_id, type, amount, description) VALUES (${beg.from_user_id}, 'received', ${amount}, ${"Получено по запросу ⚡"})`).catch(() => {});
-
-    const updatedRows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
-    res.json({ success: true, balance: Number((updatedRows.rows[0] as any)?.balance ?? 0) });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Ошибка сервера" });

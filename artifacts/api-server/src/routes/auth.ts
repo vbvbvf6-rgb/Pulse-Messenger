@@ -137,7 +137,8 @@ router.post("/auth/2fa/complete", async (req, res) => {
 
     const rows = await db.execute(
       sql`SELECT id, username, display_name, avatar_color, avatar_url, bio, status, status_text,
-                 is_verified, balance, created_at, totp_secret
+                 is_verified, is_admin, is_bot, balance, created_at, totp_secret,
+                 COALESCE(age_verified, false) as age_verified
           FROM users WHERE id = ${payload.userId} LIMIT 1`
     );
     const user = rows.rows[0] as any;
@@ -150,9 +151,11 @@ router.post("/auth/2fa/complete", async (req, res) => {
     }
 
     const token = signToken(user.id);
+    const ageVerified = user.age_verified === true || user.age_verified === "t" || user.age_verified === 1;
     res.json({
       userId: user.id,
       token,
+      ageVerified,
       user: {
         id: user.id,
         username: user.username,
@@ -163,8 +166,11 @@ router.post("/auth/2fa/complete", async (req, res) => {
         status: user.status,
         statusText: user.status_text,
         isVerified: user.is_verified,
+        isAdmin: user.is_admin === true || user.is_admin === "t" || user.is_admin === 1,
+        isBot: user.is_bot === true || user.is_bot === "t" || user.is_bot === 1,
         balance: Number(user.balance ?? 0),
         createdAt: user.created_at,
+        ageVerified,
       },
     });
   } catch (err) {
@@ -421,7 +427,13 @@ router.post("/auth/verify-password", async (req, res) => {
     const user = rows.rows[0] as any;
     const storedHash: string = user.password_hash || "";
     let valid = false;
-    try { valid = await bcrypt.compare(String(password), storedHash); } catch {}
+    try {
+      if (storedHash.startsWith("$2")) {
+        valid = await bcrypt.compare(String(password), storedHash);
+      } else {
+        valid = storedHash === sha256(String(password));
+      }
+    } catch {}
     if (!valid) return res.status(401).json({ error: "Неверный пароль" });
     res.json({ ok: true });
   } catch (err) {

@@ -111,10 +111,12 @@ router.put("/users/me/username", async (req, res) => {
 router.get("/users/search", async (req, res) => {
   try {
     const q = String(req.query.q || "");
+    // Escape SQL LIKE special chars to prevent wildcard injection
+    const escaped = q.replace(/[\\%_]/g, c => `\\${c}`);
     const users = await db.select().from(usersTable).where(
       or(
-        like(usersTable.username, `%${q}%`),
-        like(usersTable.displayName, `%${q}%`)
+        sql`${usersTable.username} ILIKE ${"%" + escaped + "%"} ESCAPE '\\'`,
+        sql`${usersTable.displayName} ILIKE ${"%" + escaped + "%"} ESCAPE '\\'`
       )
     ).limit(20);
     res.json(users);
@@ -223,7 +225,7 @@ router.get("/users/:userId/gift-showcase", async (req, res) => {
 // Report a user
 router.post("/users/:userId/report", async (req, res) => {
   try {
-    const reporterId = (req as any).userId;
+    const reporterId = req.currentUserId;
     if (!reporterId) return res.status(401).json({ error: "Unauthorized" });
     const targetId = Number(req.params.userId);
     if (!targetId || targetId === reporterId) return res.status(400).json({ error: "Invalid userId" });

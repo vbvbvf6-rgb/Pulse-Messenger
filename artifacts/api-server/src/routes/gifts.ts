@@ -151,20 +151,19 @@ router.post("/gifts/send", async (req, res) => {
     const price = (giftItem as any).price ?? 0;
 
     if (price > 0) {
-      const balanceRows = await db.execute(
-        sql`SELECT balance FROM users WHERE id = ${uid}`
+      // Atomic deduct — prevents race conditions where two gift sends could drain below zero
+      const deductResult = await db.execute(
+        sql`UPDATE users SET balance = balance - ${price} WHERE id = ${uid} AND balance >= ${price} RETURNING balance`
       );
-      const balance = Number((balanceRows.rows[0] as any)?.balance ?? 0);
-      if (balance < price) {
+      if ((deductResult.rows as any[]).length === 0) {
+        const balanceRows = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid}`);
+        const balance = Number((balanceRows.rows[0] as any)?.balance ?? 0);
         return res.status(400).json({
           error: `Недостаточно Spark. Нужно ${price} ⚡, у вас ${balance} ⚡`,
           required: price,
           balance,
         });
       }
-      await db.execute(
-        sql`UPDATE users SET balance = balance - ${price} WHERE id = ${uid}`
-      );
     }
 
     const [gift] = await db.insert(giftsTable).values({

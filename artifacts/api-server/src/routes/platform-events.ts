@@ -60,10 +60,17 @@ router.post("/platform-events/:id/join", async (req, res) => {
 
     const cost = Number(event.cost || 0);
     if (cost > 0) {
-      const userRow = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid} LIMIT 1`);
-      const balance = Number((userRow.rows[0] as any)?.balance || 0);
-      if (balance < cost) return res.status(402).json({ error: "Недостаточно искр", balance, cost });
-      await db.execute(sql`UPDATE users SET balance = balance - ${cost} WHERE id = ${uid}`);
+      // Atomic deduct — prevents race conditions where concurrent joins could overdraw
+      const deductResult = await db.execute(sql`
+        UPDATE users SET balance = balance - ${cost}
+        WHERE id = ${uid} AND balance >= ${cost}
+        RETURNING balance
+      `);
+      if ((deductResult.rows as any[]).length === 0) {
+        const userRow = await db.execute(sql`SELECT balance FROM users WHERE id = ${uid} LIMIT 1`);
+        const balance = Number((userRow.rows[0] as any)?.balance || 0);
+        return res.status(402).json({ error: "Недостаточно искр", balance, cost });
+      }
     }
 
     await db.execute(sql`

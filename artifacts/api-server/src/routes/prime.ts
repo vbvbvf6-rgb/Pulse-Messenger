@@ -86,14 +86,6 @@ router.post("/prime/subscribe", async (req, res) => {
     if (!user) return res.status(404).json({ error: "Пользователь не найден" });
 
     const balance = Number(user.balance ?? 0);
-    if (balance < plan.spark) {
-      return res.status(400).json({
-        error: `Недостаточно Spark. Нужно ${plan.spark} ⚡, у вас ${balance} ⚡`,
-        required: plan.spark,
-        balance,
-      });
-    }
-
     const now = new Date();
     const currentExpiry = user.prime_expires_at ? new Date(user.prime_expires_at) : now;
     const base = currentExpiry > now ? currentExpiry : now;
@@ -102,14 +94,23 @@ router.post("/prime/subscribe", async (req, res) => {
 
     const tierValue = isPlus ? "prime_plus" : "prime";
 
-    await db.execute(
+    // Atomic deduct — prevents race where two concurrent subscribe requests drain balance twice
+    const deductResult = await db.execute(
       sql`UPDATE users
           SET balance = balance - ${plan.spark},
               has_prime = true,
               prime_tier = ${tierValue},
               prime_expires_at = ${newExpiry.toISOString()}
-          WHERE id = ${uid}`
+          WHERE id = ${uid} AND balance >= ${plan.spark}
+          RETURNING balance`
     );
+    if ((deductResult.rows as any[]).length === 0) {
+      return res.status(400).json({
+        error: `Недостаточно Spark. Нужно ${plan.spark} ⚡, у вас ${balance} ⚡`,
+        required: plan.spark,
+        balance,
+      });
+    }
 
     const currentTier = user.prime_tier;
     const hadPrime = user.has_prime === true || user.has_prime === "t" || user.has_prime === 1;

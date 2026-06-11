@@ -248,11 +248,11 @@ router.post("/posts/:postId/like", async (req, res) => {
     });
     if (existing) {
       await db.delete(postLikesTable).where(eq(postLikesTable.id, existing.id));
-      await db.update(postsTable).set({ likesCount: Math.max(0, (await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) }))!.likesCount - 1) }).where(eq(postsTable.id, postId));
+      // Use SQL expression to decrement atomically (avoids null assertion crash)
+      await db.execute(sql`UPDATE posts SET likes_count = GREATEST(0, COALESCE(likes_count, 0) - 1) WHERE id = ${postId}`);
     } else {
       await db.insert(postLikesTable).values({ postId, userId: uid });
-      const post = await db.query.postsTable.findFirst({ where: eq(postsTable.id, postId) });
-      await db.update(postsTable).set({ likesCount: (post?.likesCount ?? 0) + 1 }).where(eq(postsTable.id, postId));
+      await db.execute(sql`UPDATE posts SET likes_count = COALESCE(likes_count, 0) + 1 WHERE id = ${postId}`);
     }
     const built = await buildPost(postId, uid);
     res.json(built);
